@@ -1,0 +1,19 @@
+Deploy do consorcio-ops (Next.js — modo demonstração)
+===============================================
+
+O app grava **administradoras**, **planos** e **vendas** no **localStorage**
+do navegador. Não exige Firebase, banco nem variáveis de ambiente para funcionar.
+
+1) Netlify / Vercel
+   - Conecte o repositório; o build usa `npm run build` (`netlify.toml` / `vercel.json`).
+   - **Não** é necessário configurar `NEXT_PUBLIC_FIREBASE_*` nem conta de serviço.
+
+2) Homologação com o cliente
+   - Cada navegador/dispositivo tem a **própria** base de dados de demonstração.
+   - Limpar dados do site ou usar outro navegador apaga a base local.
+
+3) Build local
+   - `npm install` e `npm run build`
+
+4) Pasta `firebase/`
+   - Pode permanecer no repo para um futuro retorno ao Firestore; não é usada pelo app neste modo.

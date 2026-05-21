@@ -1,0 +1,20 @@
+Firebase — configuração do projeto
+==================================
+
+1) SDK Web (Analytics / frontend)
+   - Variáveis NEXT_PUBLIC_FIREBASE_* no `.env.local` (Firebase Console → Seus apps → SDK).
+
+2) Service Account (Admin SDK — Server Actions / Firestore no servidor)
+   - Firebase Console → Configurações do projeto → Contas de serviço
+   - "Gerar nova chave privada" → salve o JSON como:
+     firebase/serviceAccountKey.json
+   - No `.env.local`:
+     FIREBASE_SERVICE_ACCOUNT_PATH=firebase/serviceAccountKey.json
+   - Esse arquivo NÃO deve ir para o Git (já está no .gitignore).
+
+3) Firestore
+   - Console → Firestore Database → criar banco (se ainda não existir).
+   - Regras: cole o conteúdo de `firestore.rules` ou `firebase deploy --only firestore:rules`.
+
+4) Deploy das regras com Firebase CLI (opcional)
+   - Na raiz: `firebase login` → `firebase deploy --only firestore:rules,storage`

@@ -1,0 +1,20 @@
+rules_version = '2';
+
+// Cole no Firebase Console → Storage → Regras
+// Ou: firebase deploy --only storage (com firebase.json na raiz)
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Padrão seguro: nenhum upload/download até você definir pastas e Auth.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // --- Exemplo: arquivos só do usuário logado ---
+    //
+    // match /users/{userId}/{allPaths=**} {
+    //   allow read, write: if request.auth != null && request.auth.uid == userId;
+    // }
+  }
+}

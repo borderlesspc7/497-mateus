@@ -1,0 +1,7 @@
+# https://docs.netlify.com/build/configure-builds/file-based-configuration/
+# Build runs Prisma via `npm run build` in package.json (works when Netlify UI only runs `npm run build`).
+[build]
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "22"
