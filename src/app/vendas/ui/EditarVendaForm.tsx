@@ -9,7 +9,7 @@ import { CurrencyInput } from "@/components/form/MaskedInputs";
 import { backLinkClass } from "@/components/page-flow/button-classes";
 import { PageFlowHeader } from "@/components/page-flow/PageFlowHeader";
 import { formControlClass, panelClass } from "@/components/ui/list-panel-classes";
-import type { AdministradoraMini, PlanoMini, VendaRow } from "@/lib/types/domain";
+import type { AdministradoraMini, ConsorciadoMini, PlanoMini, VendaRow } from "@/lib/types/domain";
 import {
   formatCentavosToCurrencyInput,
   parseCurrencyToCentavos,
@@ -19,6 +19,7 @@ type EditarVendaFormProps = {
   item: VendaRow;
   administradoras: AdministradoraMini[];
   initialPlanos: PlanoMini[];
+  consorciados: ConsorciadoMini[];
 };
 
 function dateToInputValue(iso: string | null) {
@@ -35,6 +36,7 @@ export default function EditarVendaForm({
   item,
   administradoras,
   initialPlanos,
+  consorciados,
 }: EditarVendaFormProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -43,6 +45,7 @@ export default function EditarVendaForm({
   const [planos, setPlanos] = useState<PlanoMini[]>(initialPlanos);
 
   const [form, setForm] = useState({
+    consorciadoId: item.consorciadoId ?? "",
     administradoraId: item.administradoraId,
     planoId: item.planoId ?? "",
     titulo: item.titulo,
@@ -118,8 +121,20 @@ export default function EditarVendaForm({
       return t ? t : null;
     };
 
+    if (!form.titulo.trim()) {
+      setError("Informe o título da venda.");
+      setSaving(false);
+      return;
+    }
+    if (!form.consorciadoId.trim()) {
+      setError("Selecione um consorciado.");
+      setSaving(false);
+      return;
+    }
+
     try {
       await updateVenda(item.id, {
+        consorciadoId: form.consorciadoId,
         administradoraId: form.administradoraId,
         planoId: form.planoId.trim() ? form.planoId.trim() : null,
         titulo: form.titulo.trim(),
@@ -147,7 +162,7 @@ export default function EditarVendaForm({
           { label: "Editar" },
         ]}
         title={item.titulo}
-        description="Atualize administradora, plano, status, valores e detalhes da venda."
+        description="Atualize consorciado, administradora, plano, status, valores e detalhes da venda."
         actions={
           <Link href="/vendas" className={backLinkClass()}>
             Voltar à lista
@@ -159,6 +174,35 @@ export default function EditarVendaForm({
         <div className="text-sm font-medium">Dados da venda</div>
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <label className="block md:col-span-2">
+            <div className="mb-1 text-xs font-medium text-zinc-600">
+              Consorciado <span className="text-red-600"> *</span>
+            </div>
+            <select
+              value={form.consorciadoId}
+              onChange={(e) => setForm((p) => ({ ...p, consorciadoId: e.target.value }))}
+              className={formControlClass()}
+              disabled={consorciados.length === 0}
+            >
+              {consorciados.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome} ({c.documento})
+                </option>
+              ))}
+            </select>
+            {consorciados.length === 0 ? (
+              <div className="mt-2 text-xs text-zinc-500">
+                Nenhum consorciado cadastrado.{" "}
+                <Link
+                  href="/consorciados/nova"
+                  className="font-medium text-zinc-800 underline-offset-2 hover:underline"
+                >
+                  Novo consorciado
+                </Link>
+              </div>
+            ) : null}
+          </label>
+
           <label className="block md:col-span-2">
             <div className="mb-1 text-xs font-medium text-zinc-600">
               Administradora <span className="text-red-600"> *</span>
@@ -274,7 +318,7 @@ export default function EditarVendaForm({
           <button
             type="submit"
             className="inline-flex h-10 items-center justify-center rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
-            disabled={saving}
+            disabled={saving || consorciados.length === 0}
           >
             {saving ? "Salvando..." : "Salvar alterações"}
           </button>

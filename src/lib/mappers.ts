@@ -1,6 +1,7 @@
 import { formatCnpj } from "@/lib/validators/cnpj";
 import type {
   AdministradoraDoc,
+  ConsorciadoDoc,
   DocWithId,
   PlanoDoc,
   VendaDoc,
@@ -8,6 +9,8 @@ import type {
 import type {
   AdministradoraMini,
   AdministradoraRow,
+  ConsorciadoMini,
+  ConsorciadoRow,
   PlanoMini,
   PlanoRow,
   VendaRow,
@@ -65,17 +68,40 @@ export function toPlanoMini(plano: DocWithId<PlanoDoc>): PlanoMini {
   return { id: plano.id, nome: plano.nome, tipoBem: plano.tipoBem };
 }
 
+export function toConsorciadoRow(item: DocWithId<ConsorciadoDoc>): ConsorciadoRow {
+  return {
+    id: item.id,
+    nome: item.nome,
+    documento: item.documento,
+    telefone: item.telefone,
+    email: item.email,
+    endereco: item.endereco,
+    criadoEm: item.criadoEm,
+  };
+}
+
+export function toConsorciadoMini(item: DocWithId<ConsorciadoDoc>): ConsorciadoMini {
+  return {
+    id: item.id,
+    nome: item.nome,
+    documento: item.documento,
+  };
+}
+
 export function toVendaRow(
   venda: DocWithId<VendaDoc>,
   administradora: DocWithId<AdministradoraDoc>,
   plano: DocWithId<PlanoDoc> | null,
+  consorciado: DocWithId<ConsorciadoDoc> | null,
 ): VendaRow {
   return {
     id: venda.id,
     administradoraId: venda.administradoraId,
     planoId: venda.planoId,
+    consorciadoId: venda.consorciadoId,
     administradora: toAdmMini(administradora),
     plano: plano ? toPlanoMini(plano) : null,
+    consorciado: consorciado ? toConsorciadoMini(consorciado) : null,
     status: venda.status,
     titulo: venda.titulo,
     descricao: venda.descricao,

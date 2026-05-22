@@ -16,5 +16,8 @@ service cloud.firestore {
     match /vendas/{docId} {
       allow read, write: if request.auth != null;
     }
+    match /consorciados/{docId} {
+      allow read, write: if request.auth != null;
+    }
   }
 }

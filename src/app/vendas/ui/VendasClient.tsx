@@ -77,7 +77,7 @@ export default function VendasClient({
       if (status && v.status !== status) return false;
       if (administradoraId && v.administradoraId !== administradoraId) return false;
       if (!q) return true;
-      const hay = `${v.titulo} ${v.administradora?.nome ?? ""} ${v.plano?.nome ?? ""}`.toLowerCase();
+      const hay = `${v.titulo} ${v.consorciado?.nome ?? ""} ${v.administradora?.nome ?? ""} ${v.plano?.nome ?? ""}`.toLowerCase();
       return hay.includes(q);
     });
   }, [items, query, status, administradoraId]);
@@ -104,7 +104,7 @@ export default function VendasClient({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por título ou administradora..."
+            placeholder="Buscar por título, consorciado ou administradora..."
             className={formControlClass("lg")}
           />
           <select
@@ -148,6 +148,7 @@ export default function VendasClient({
           <thead>
             <tr>
               <th className={tableHeadCellClass()}>Título</th>
+              <th className={tableHeadCellClass()}>Consorciado</th>
               <th className={tableHeadCellClass()}>Administradora</th>
               <th className={tableHeadCellClass()}>Plano</th>
               <th className={tableHeadCellClass()}>Status</th>
@@ -160,7 +161,7 @@ export default function VendasClient({
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td className={tableEmptyCellClass()} colSpan={8}>
+                <td className={tableEmptyCellClass()} colSpan={9}>
                   {items.length === 0
                     ? "Nenhuma venda cadastrada."
                     : "Nenhum resultado para os filtros atuais."}
@@ -170,6 +171,23 @@ export default function VendasClient({
               filtered.map((v) => (
                 <tr key={v.id}>
                   <td className={`${tableCellClass()} font-medium text-zinc-900`}>{v.titulo}</td>
+                  <td className={tableCellClass()}>
+                    <div className="leading-5">
+                      {v.consorciado ? (
+                        <Link
+                          href={`/consorciados/${v.consorciado.id}`}
+                          className="font-medium text-zinc-900 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 rounded-sm"
+                        >
+                          {v.consorciado.nome}
+                        </Link>
+                      ) : (
+                        <div className="text-zinc-800">—</div>
+                      )}
+                      {v.consorciado?.documento ? (
+                        <div className="text-xs text-zinc-500">{v.consorciado.documento}</div>
+                      ) : null}
+                    </div>
+                  </td>
                   <td className={tableCellClass()}>
                     <div className="leading-5">
                       <Link

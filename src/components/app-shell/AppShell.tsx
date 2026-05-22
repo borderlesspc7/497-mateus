@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PropsWithChildren, useEffect, useState } from "react";
+import { ensureFirebaseAuth } from "@/lib/firebase/client";
 
 const nav = [
   { href: "/", label: "Dashboard" },
+  { href: "/consorciados", label: "Consorciados" },
   { href: "/administradoras", label: "Administradoras" },
   { href: "/planos", label: "Planos" },
   { href: "/vendas", label: "Vendas" },
@@ -40,6 +42,12 @@ function NavLink({ href, label }: { href: string; label: string }) {
 export function AppShell({ children }: PropsWithChildren) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    void ensureFirebaseAuth().catch(() => {
+      // Falha silenciosa: módulos server-side continuam via Admin SDK.
+    });
+  }, []);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -80,7 +88,7 @@ export function AppShell({ children }: PropsWithChildren) {
           </nav>
 
           <div className="mt-auto rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-xs leading-5 text-zinc-600">
-            Administradoras, planos e vendas no Firestore (Firebase).
+            Consorciados, administradoras, planos e vendas no Firestore (Firebase).
           </div>
         </aside>
 

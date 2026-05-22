@@ -7,10 +7,11 @@ import { listPlanosMiniByAdministradora } from "@/actions/planos";
 import { createVenda } from "@/actions/vendas";
 import { CurrencyInput } from "@/components/form/MaskedInputs";
 import { formControlClass, panelClass } from "@/components/ui/list-panel-classes";
-import type { AdministradoraMini, PlanoMini } from "@/lib/types/domain";
+import type { AdministradoraMini, ConsorciadoMini, PlanoMini } from "@/lib/types/domain";
 import { parseCurrencyToCentavos } from "@/lib/validators/currency";
 
 type FormState = {
+  consorciadoId: string;
   administradoraId: string;
   planoId: string;
   titulo: string;
@@ -23,6 +24,7 @@ type FormState = {
 
 type NovaVendaFormProps = {
   administradoras: AdministradoraMini[];
+  consorciados: ConsorciadoMini[];
 };
 
 function Field({
@@ -57,9 +59,10 @@ function Field({
   );
 }
 
-export default function NovaVendaForm({ administradoras }: NovaVendaFormProps) {
+export default function NovaVendaForm({ administradoras, consorciados }: NovaVendaFormProps) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>({
+    consorciadoId: consorciados[0]?.id ?? "",
     administradoraId: administradoras[0]?.id ?? "",
     planoId: "",
     titulo: "",
@@ -132,9 +135,19 @@ export default function NovaVendaForm({ administradoras }: NovaVendaFormProps) {
       return t ? t : null;
     };
 
+    if (!form.titulo.trim()) {
+      setError("Informe o título da venda.");
+      return;
+    }
+    if (!form.consorciadoId.trim()) {
+      setError("Selecione um consorciado.");
+      return;
+    }
+
     setSaving(true);
     try {
       await createVenda({
+        consorciadoId: form.consorciadoId,
         administradoraId: form.administradoraId,
         planoId: form.planoId.trim() ? form.planoId.trim() : null,
         titulo: form.titulo.trim(),
@@ -158,6 +171,35 @@ export default function NovaVendaForm({ administradoras }: NovaVendaFormProps) {
       <div className="text-sm font-medium">Dados da venda</div>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <label className="block md:col-span-2">
+          <div className="mb-1 text-xs font-medium text-zinc-600">
+            Consorciado <span className="text-red-600"> *</span>
+          </div>
+          <select
+            value={form.consorciadoId}
+            onChange={(e) => setForm((p) => ({ ...p, consorciadoId: e.target.value }))}
+            className={formControlClass()}
+            disabled={consorciados.length === 0}
+          >
+            {consorciados.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nome} ({c.documento})
+              </option>
+            ))}
+          </select>
+          {consorciados.length === 0 ? (
+            <div className="mt-2 text-xs text-zinc-500">
+              Você precisa cadastrar um consorciado antes.{" "}
+              <Link
+                href="/consorciados/nova"
+                className="font-medium text-zinc-800 underline-offset-2 hover:underline"
+              >
+                Novo consorciado
+              </Link>
+            </div>
+          ) : null}
+        </label>
+
         <label className="block md:col-span-2">
           <div className="mb-1 text-xs font-medium text-zinc-600">
             Administradora <span className="text-red-600"> *</span>
@@ -296,7 +338,7 @@ export default function NovaVendaForm({ administradoras }: NovaVendaFormProps) {
         <button
           type="submit"
           className="inline-flex h-10 items-center justify-center rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
-          disabled={saving || administradoras.length === 0}
+          disabled={saving || administradoras.length === 0 || consorciados.length === 0}
         >
           {saving ? "Salvando..." : "Salvar"}
         </button>

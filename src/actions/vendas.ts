@@ -5,6 +5,7 @@ import {
   createVenda as createVendaDoc,
   deleteVenda as deleteVendaDoc,
   getAdministradora,
+  getConsorciado,
   getPlano,
   getVenda as getVendaDoc,
   listVendas as listVendasDocs,
@@ -15,6 +16,7 @@ import type { VendaRow, VendaStatus } from "@/lib/types/domain";
 export type VendaInput = {
   administradoraId: string;
   planoId: string | null;
+  consorciadoId: string;
   status: VendaStatus;
   titulo: string;
   descricao: string | null;
@@ -45,6 +47,11 @@ async function assertPlanoBelongs(
   }
 }
 
+async function assertConsorciadoExists(consorciadoId: string): Promise<void> {
+  const consorciado = await getConsorciado(consorciadoId);
+  if (!consorciado) throw new Error("Consorciado não encontrado.");
+}
+
 export async function listVendas(): Promise<VendaRow[]> {
   return listVendasDocs();
 }
@@ -56,13 +63,16 @@ export async function getVenda(id: string): Promise<VendaRow | null> {
 export async function createVenda(data: VendaInput): Promise<VendaRow> {
   const titulo = data.titulo.trim();
   if (!titulo) throw new Error("Informe o título da venda.");
+  if (!data.consorciadoId.trim()) throw new Error("Selecione um consorciado.");
 
   await assertAdministradoraExists(data.administradoraId);
   await assertPlanoBelongs(data.planoId, data.administradoraId);
+  await assertConsorciadoExists(data.consorciadoId);
 
   const row = await createVendaDoc({
     administradoraId: data.administradoraId,
     planoId: data.planoId,
+    consorciadoId: data.consorciadoId,
     status: data.status,
     titulo,
     descricao: data.descricao,
@@ -81,11 +91,19 @@ export async function updateVenda(id: string, patch: Partial<VendaInput>): Promi
 
   const nextAdm = patch.administradoraId ?? current.administradoraId;
   const nextPlano = patch.planoId !== undefined ? patch.planoId : current.planoId;
+  const nextConsorciado =
+    patch.consorciadoId !== undefined ? patch.consorciadoId : current.consorciadoId ?? "";
 
   if (patch.administradoraId) {
     await assertAdministradoraExists(patch.administradoraId);
   }
   await assertPlanoBelongs(nextPlano, nextAdm);
+  if (patch.consorciadoId !== undefined) {
+    if (!patch.consorciadoId.trim()) throw new Error("Selecione um consorciado.");
+    await assertConsorciadoExists(patch.consorciadoId);
+  } else if (!nextConsorciado.trim()) {
+    throw new Error("Selecione um consorciado.");
+  }
 
   const data: Partial<VendaInput> = { ...patch };
   if (patch.titulo !== undefined) {
@@ -97,6 +115,7 @@ export async function updateVenda(id: string, patch: Partial<VendaInput>): Promi
   const row = await updateVendaDoc(id, {
     administradoraId: data.administradoraId,
     planoId: data.planoId,
+    consorciadoId: data.consorciadoId,
     status: data.status,
     titulo: data.titulo,
     descricao: data.descricao,

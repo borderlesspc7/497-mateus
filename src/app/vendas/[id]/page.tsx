@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { listConsorciadosMini } from "@/actions/consorciados";
 import { listAdministradoras } from "@/actions/administradoras";
 import { listPlanosMiniByAdministradora } from "@/actions/planos";
 import { getVenda } from "@/actions/vendas";
@@ -35,9 +36,10 @@ export default async function EditarVendaPage({ params }: PageProps) {
     );
   }
 
-  const [administradoras, initialPlanos] = await Promise.all([
+  const [administradoras, initialPlanos, consorciados] = await Promise.all([
     listAdministradoras(),
     listPlanosMiniByAdministradora(venda.administradoraId),
+    listConsorciadosMini(),
   ]);
 
   return (
@@ -49,6 +51,7 @@ export default async function EditarVendaPage({ params }: PageProps) {
         cnpj: a.cnpj,
       }))}
       initialPlanos={initialPlanos}
+      consorciados={consorciados}
     />
   );
 }

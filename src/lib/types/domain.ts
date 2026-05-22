@@ -37,12 +37,26 @@ export type PlanoRow = {
 
 export type PlanoMini = { id: string; nome: string; tipoBem: string };
 
+export type ConsorciadoRow = {
+  id: string;
+  nome: string;
+  documento: string;
+  telefone: string;
+  email: string;
+  endereco: string;
+  criadoEm: string;
+};
+
+export type ConsorciadoMini = { id: string; nome: string; documento: string };
+
 export type VendaRow = {
   id: string;
   administradoraId: string;
   planoId: string | null;
+  consorciadoId: string | null;
   administradora: AdministradoraMini;
   plano: PlanoMini | null;
+  consorciado: ConsorciadoMini | null;
   status: VendaStatus;
   titulo: string;
   descricao: string | null;
@@ -58,4 +72,45 @@ export type DashboardCounts = {
   nPlanos: number;
   nVendas: number;
   nVendasFechadas: number;
+};
+
+export type DashboardVendaResumo = {
+  id: string;
+  titulo: string;
+  status: VendaStatus;
+  valorCentavos: number | null;
+  dataVenda: string | null;
+  consorciadoNome: string | null;
+  administradoraNome: string;
+};
+
+export type DashboardMesResumo = {
+  key: string;
+  label: string;
+  quantidade: number;
+  valorCentavos: number;
+};
+
+export type DashboardAdmResumo = {
+  id: string;
+  nome: string;
+  quantidade: number;
+  valorCentavos: number;
+};
+
+export type DashboardStats = {
+  nConsorciados: number;
+  nAdministradoras: number;
+  nPlanos: number;
+  nVendas: number;
+  nVendasFechadas: number;
+  nVendasRascunho: number;
+  nVendasEnviadas: number;
+  nVendasCanceladas: number;
+  valorTotalCentavos: number;
+  valorFechadasCentavos: number;
+  ticketMedioCentavos: number | null;
+  vendasPorMes: DashboardMesResumo[];
+  vendasRecentes: DashboardVendaResumo[];
+  vendasPorAdministradora: DashboardAdmResumo[];
 };

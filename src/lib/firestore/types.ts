@@ -4,6 +4,7 @@ export const COLLECTIONS = {
   administradoras: "administradoras",
   planos: "planos",
   vendas: "vendas",
+  consorciados: "consorciados",
 } as const;
 
 export type AdministradoraDoc = {
@@ -36,9 +37,19 @@ export type PlanoDoc = {
   updatedAt: string;
 };
 
+export type ConsorciadoDoc = {
+  nome: string;
+  documento: string;
+  telefone: string;
+  email: string;
+  endereco: string;
+  criadoEm: string;
+};
+
 export type VendaDoc = {
   administradoraId: string;
   planoId: string | null;
+  consorciadoId: string | null;
   status: VendaStatus;
   titulo: string;
   descricao: string | null;
@@ -62,5 +73,11 @@ export function nowIso(): string {
 export function sortByCreatedAtDesc<T extends { createdAt: string }>(rows: T[]): T[] {
   return [...rows].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+}
+
+export function sortByCriadoEmDesc<T extends { criadoEm: string }>(rows: T[]): T[] {
+  return [...rows].sort(
+    (a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime(),
   );
 }

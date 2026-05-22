@@ -1,7 +1,7 @@
-import { getDashboardCounts } from "@/actions/dashboard";
+import { getDashboardStats } from "@/actions/dashboard";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
 
 export default async function Home() {
-  const counts = await getDashboardCounts();
-  return <DashboardHome initialCounts={counts} />;
+  const stats = await getDashboardStats();
+  return <DashboardHome stats={stats} />;
 }
