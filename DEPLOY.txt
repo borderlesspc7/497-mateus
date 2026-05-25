@@ -1,19 +1,43 @@
-Deploy do consorcio-ops (Next.js — modo demonstração)
-===============================================
+Deploy do consorcio-ops (Next.js + Firebase Firestore)
+======================================================
 
-O app grava **administradoras**, **planos** e **vendas** no **localStorage**
-do navegador. Não exige Firebase, banco nem variáveis de ambiente para funcionar.
+O app usa Firebase Admin SDK no servidor (Netlify/Vercel) e SDK web no browser
+(módulo Consorciados). Variáveis de ambiente são OBRIGATÓRIAS em produção.
 
-1) Netlify / Vercel
-   - Conecte o repositório; o build usa `npm run build` (`netlify.toml` / `vercel.json`).
-   - **Não** é necessário configurar `NEXT_PUBLIC_FIREBASE_*` nem conta de serviço.
+1) Netlify — variáveis de ambiente (Site settings → Environment variables)
+   Copie do .env.local:
 
-2) Homologação com o cliente
-   - Cada navegador/dispositivo tem a **própria** base de dados de demonstração.
-   - Limpar dados do site ou usar outro navegador apaga a base local.
+   NEXT_PUBLIC_FIREBASE_API_KEY
+   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+   NEXT_PUBLIC_FIREBASE_PROJECT_ID
+   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+   NEXT_PUBLIC_FIREBASE_APP_ID
+   FIREBASE_PROJECT_ID
 
-3) Build local
-   - `npm install` e `npm run build`
+   Service account (escolha UMA opção — o arquivo JSON NÃO vai no Git):
 
-4) Pasta `firebase/`
-   - Pode permanecer no repo para um futuro retorno ao Firestore; não é usada pelo app neste modo.
+   Opção A — JSON inteiro em uma variável:
+   FIREBASE_SERVICE_ACCOUNT={"type":"service_account","project_id":"...",...}
+
+   Opção B — Base64 do JSON (recomendado no Netlify):
+   FIREBASE_SERVICE_ACCOUNT_BASE64=<conteúdo base64 do arquivo JSON>
+
+   Opção C — Campos separados:
+   FIREBASE_PROJECT_ID=mateus-40473
+   FIREBASE_CLIENT_EMAIL=firebase-adminsdk-...@mateus-40473.iam.gserviceaccount.com
+   FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+
+   NÃO use FIREBASE_SERVICE_ACCOUNT_PATH em produção (o arquivo não existe no servidor).
+
+2) Firebase Console
+   - Authentication → Sign-in method → Anonymous → Enable
+   - Firestore criado e regras publicadas (firebase deploy --only firestore:rules)
+
+3) Build Netlify
+   - Build command: npm run build
+   - Publish: gerenciado pelo plugin Next.js (netlify.toml)
+
+4) Erro comum em produção
+   "An error occurred in the Server Components render"
+   → Quase sempre falta a service account nas env vars do Netlify (item 1).

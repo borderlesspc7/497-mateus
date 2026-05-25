@@ -46,6 +46,20 @@ function parseServiceAccountFromEnv(): ServiceAccount | null {
   }
 }
 
+function parseServiceAccountFromBase64Env(): ServiceAccount | null {
+  const encoded = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64?.trim();
+  if (!encoded) return null;
+  try {
+    const raw = Buffer.from(encoded, "base64").toString("utf8");
+    const parsed = JSON.parse(raw) as ServiceAccountPayload;
+    const normalized = normalizeServiceAccount(parsed);
+    if (!normalized.projectId || !normalized.clientEmail || !normalized.privateKey) return null;
+    return normalized;
+  } catch {
+    return null;
+  }
+}
+
 function loadServiceAccountFromSeparateEnv(): ServiceAccount | null {
   const projectId =
     process.env.FIREBASE_PROJECT_ID?.trim() ||
@@ -65,14 +79,19 @@ function getServiceAccount(): ServiceAccount {
   const fromEnvJson = parseServiceAccountFromEnv();
   if (fromEnvJson) return fromEnvJson;
 
+  const fromBase64 = parseServiceAccountFromBase64Env();
+  if (fromBase64) return fromBase64;
+
   const fromSeparateEnv = loadServiceAccountFromSeparateEnv();
   if (fromSeparateEnv) return fromSeparateEnv;
 
+  const isServerless = Boolean(process.env.NETLIFY || process.env.VERCEL);
   throw new Error(
     [
       "Firebase Admin não configurado.",
-      "Baixe a chave em Firebase Console → Configurações → Contas de serviço → Gerar nova chave privada.",
-      "Salve como firebase/serviceAccountKey.json e defina FIREBASE_SERVICE_ACCOUNT_PATH=firebase/serviceAccountKey.json no .env.local.",
+      isServerless
+        ? "No Netlify/Vercel, o arquivo JSON da service account não vai no deploy. Configure FIREBASE_SERVICE_ACCOUNT (JSON em uma linha), FIREBASE_SERVICE_ACCOUNT_BASE64 ou FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY nas variáveis de ambiente do painel."
+        : "Localmente: baixe a chave em Firebase Console → Contas de serviço e use FIREBASE_SERVICE_ACCOUNT_PATH ou FIREBASE_SERVICE_ACCOUNT no .env.local.",
     ].join(" "),
   );
 }
