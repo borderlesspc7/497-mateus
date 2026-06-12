@@ -1,4 +1,4 @@
-import { readConsorciadoCpfCnpj, normalizeVendaFields } from "@/lib/firestore/legacy";
+import { normalizeVendaFields, readConsorciadoCpfCnpj, sanitizeConsorciadoDoc } from "@/lib/firestore/legacy";
 import { resolvePlanoRegrasFinanceiras } from "@/lib/planos/regras-financeiras";
 import { DEFAULT_CHECKLIST_ATIVACAO } from "@/lib/vendas/pos-venda";
 import { formatCnpj } from "@/lib/validators/cnpj";
@@ -79,22 +79,24 @@ export function toPlanoMini(plano: DocWithId<PlanoDoc>): PlanoMini {
 }
 
 export function toConsorciadoRow(item: DocWithId<ConsorciadoDoc>): ConsorciadoRow {
+  const sanitized = sanitizeConsorciadoDoc(item);
   return {
     id: item.id,
-    nome: item.nome,
-    cpf_cnpj: readConsorciadoCpfCnpj(item),
-    telefone: item.telefone,
-    email: item.email,
-    criadoEm: item.criadoEm,
+    nome: sanitized.nome,
+    cpf_cnpj: sanitized.cpf_cnpj,
+    telefone: sanitized.telefone,
+    email: sanitized.email,
+    criadoEm: sanitized.criadoEm,
   };
 }
 
 export function toConsorciadoMini(item: DocWithId<ConsorciadoDoc>): ConsorciadoMini {
+  const sanitized = sanitizeConsorciadoDoc(item);
   return {
     id: item.id,
-    nome: item.nome,
-    cpf_cnpj: readConsorciadoCpfCnpj(item),
-    telefone: item.telefone,
+    nome: sanitized.nome,
+    cpf_cnpj: sanitized.cpf_cnpj,
+    telefone: sanitized.telefone,
   };
 }
 
@@ -152,11 +154,11 @@ export function toVendaRow(
     consorciado: consorciado ? toConsorciadoMini(consorciado) : null,
     equipe: equipe ? toEquipeMini(equipe) : null,
     vendedor: vendedor ? toVendedorMini(vendedor) : null,
-    status: normalized.status,
+    statusOperacional: normalized.statusOperacional,
     statusInconsistencia: normalized.statusInconsistencia,
     statusPosVenda: normalized.statusPosVenda,
     parcelasPagasCancelamento: normalized.parcelasPagasCancelamento,
-    contrato: normalized.contrato,
+    numeroContrato: normalized.numeroContrato,
     grupo: normalized.grupo,
     cota: normalized.cota,
     dataVencimento: normalized.dataVencimento,
@@ -164,6 +166,7 @@ export function toVendaRow(
     descricao: venda.descricao,
     valorCentavos: venda.valorCentavos,
     dataVenda: venda.dataVenda,
+    mesAnoFechamento: venda.mesAnoFechamento ?? null,
     observacoes: venda.observacoes,
     checklistAtivacao: venda.checklistAtivacao ?? DEFAULT_CHECKLIST_ATIVACAO,
     dataPendencia: venda.dataPendencia ?? null,

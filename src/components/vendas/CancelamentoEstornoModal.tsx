@@ -6,7 +6,7 @@ import { formControlClass, secondaryActionClass } from "@/components/ui/list-pan
 
 type CancelamentoEstornoModalProps = {
   open: boolean;
-  contrato: string;
+  numeroContrato: string;
   saving?: boolean;
   onConfirm: (parcelasPagas: number) => void;
   onClose: () => void;
@@ -14,7 +14,7 @@ type CancelamentoEstornoModalProps = {
 
 export function CancelamentoEstornoModal({
   open,
-  contrato,
+  numeroContrato,
   saving = false,
   onConfirm,
   onClose,
@@ -70,7 +70,7 @@ export function CancelamentoEstornoModal({
           Cancelamento da venda
         </h2>
         <p className="mt-2 text-sm leading-6 text-zinc-600">
-          A venda <span className="font-semibold text-zinc-900">{contrato}</span> será marcada como
+          A venda <span className="font-semibold text-zinc-900">{numeroContrato}</span> será marcada como
           cancelada. Informe quantas parcelas foram pagas antes do cancelamento para calcular o
           estorno de comissão automaticamente.
         </p>

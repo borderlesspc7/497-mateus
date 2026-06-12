@@ -8,40 +8,56 @@ import { listVendedoresMiniByEquipe } from "@/actions/vendedores";
 import { createVenda } from "@/actions/vendas";
 import { ConsorciadoAutocomplete } from "@/components/form/ConsorciadoAutocomplete";
 import { CurrencyInput } from "@/components/form/MaskedInputs";
-import { formControlClass, panelClass } from "@/components/ui/list-panel-classes";
+import { primaryCtaClass } from "@/components/page-flow/button-classes";
+import {
+  createConsorciado,
+  type ConsorciadoInput,
+} from "@/lib/firestore/consorciados-client";
+import { formControlClass, formSectionClass } from "@/components/ui/list-panel-classes";
 import type {
   AdministradoraMini,
   ConsorciadoMini,
   EquipeMini,
   PlanoMini,
-  VendaStatus,
+  StatusOperacionalCota,
   VendedorMini,
 } from "@/lib/types/domain";
-import { parseCurrencyToCentavos } from "@/lib/validators/currency";
+import {
+  buildVendaTitulo,
+  formatZodError,
+  novaVendaOperacionalSchema,
+  novoConsorciadoSchema,
+  parseValorCreditoToCentavos,
+} from "@/lib/vendas/nova-venda-schema";
 
-type FormState = {
-  consorciadoId: string;
+type ConsorciadoMode = "existente" | "novo" | null;
+
+type VendaFormState = {
   equipeId: string;
   vendedorId: string;
   administradoraId: string;
   planoId: string;
-  contrato: string;
+  numeroContrato: string;
   grupo: string;
   cota: string;
   dataVencimento: string;
-  titulo: string;
-  status: VendaStatus;
+  statusOperacional: StatusOperacionalCota;
   valor: string;
-  dataVenda: string;
-  descricao: string;
-  observacoes: string;
+  dataFechamento: string;
+  mesAnoFechamento: string;
+};
+
+type NovoConsorciadoFormState = {
+  nome: string;
+  cpf_cnpj: string;
+  telefone: string;
+  email: string;
 };
 
 type NovaVendaFormProps = {
   administradoras: AdministradoraMini[];
   consorciados: ConsorciadoMini[];
   equipes: EquipeMini[];
-  vendedores: VendedorMini[];
 };
 
 function Field({
@@ -76,34 +92,69 @@ function Field({
   );
 }
 
+function modeButtonClass(active: boolean) {
+  return [
+    "inline-flex min-h-11 flex-1 items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors",
+    active
+      ? "border-zinc-900 bg-zinc-900 text-white shadow-sm"
+      : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50",
+  ].join(" ");
+}
+
+function StepBadge({ number, done }: { number: number; done: boolean }) {
+  return (
+    <span
+      className={[
+        "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+        done ? "bg-emerald-100 text-emerald-800" : "bg-zinc-900 text-white",
+      ].join(" ")}
+    >
+      {done ? "✓" : number}
+    </span>
+  );
+}
+
 export default function NovaVendaForm({
   administradoras,
-  consorciados,
+  consorciados: initialConsorciados,
   equipes,
 }: NovaVendaFormProps) {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>({
-    consorciadoId: "",
+  const [consorciadoMode, setConsorciadoMode] = useState<ConsorciadoMode>(null);
+  const [consorciados, setConsorciados] = useState<ConsorciadoMini[]>(initialConsorciados);
+  const [consorciadoId, setConsorciadoId] = useState("");
+  const [novoConsorciado, setNovoConsorciado] = useState<NovoConsorciadoFormState>({
+    nome: "",
+    cpf_cnpj: "",
+    telefone: "",
+    email: "",
+  });
+
+  const [form, setForm] = useState<VendaFormState>({
     equipeId: equipes[0]?.id ?? "",
     vendedorId: "",
     administradoraId: administradoras[0]?.id ?? "",
     planoId: "",
-    contrato: "",
+    numeroContrato: "",
     grupo: "",
     cota: "",
     dataVencimento: "10",
-    titulo: "",
-    status: "ATIVO",
+    statusOperacional: "ATIVO",
     valor: "",
-    dataVenda: "",
-    descricao: "",
-    observacoes: "",
+    dataFechamento: "",
+    mesAnoFechamento: "",
   });
+
   const [planos, setPlanos] = useState<PlanoMini[]>([]);
   const [vendedores, setVendedores] = useState<VendedorMini[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [valorTouched, setValorTouched] = useState(false);
+
+  const consorciadoPronto =
+    consorciadoMode === "existente"
+      ? Boolean(consorciadoId.trim())
+      : consorciadoMode === "novo";
 
   useEffect(() => {
     if (!form.administradoraId) {
@@ -141,7 +192,7 @@ export default function NovaVendaForm({
         if (!alive) return;
         setVendedores(data);
         setForm((p) => {
-          if (!p.vendedorId) return p;
+          if (!p.vendedorId) return { ...p, vendedorId: data[0]?.id ?? "" };
           return data.some((v) => v.id === p.vendedorId) ? p : { ...p, vendedorId: data[0]?.id ?? "" };
         });
       })
@@ -156,357 +207,470 @@ export default function NovaVendaForm({
 
   const valorError = useMemo(() => {
     if (!valorTouched && !form.valor) return null;
-    if (!form.valor.trim()) return null;
+    if (!form.valor.trim()) return "Informe o valor do crédito.";
     try {
-      parseCurrencyToCentavos(form.valor);
+      const centavos = parseValorCreditoToCentavos(form.valor);
+      if (centavos <= 0) return "O valor do crédito deve ser maior que zero.";
       return null;
     } catch {
       return "Valor inválido.";
     }
   }, [form.valor, valorTouched]);
 
+  function normalizeCpfCnpj(value: string): string {
+    return value.replace(/\D/g, "");
+  }
+
+  function findConsorciadoDuplicado(cpfCnpj: string): ConsorciadoMini | undefined {
+    const digits = normalizeCpfCnpj(cpfCnpj);
+    if (!digits) return undefined;
+    return consorciados.find((c) => normalizeCpfCnpj(c.cpf_cnpj) === digits);
+  }
+
+  async function resolveConsorciadoId(): Promise<string> {
+    if (consorciadoMode === "existente") {
+      if (!consorciadoId.trim()) throw new Error("Selecione um consorciado existente.");
+      return consorciadoId;
+    }
+
+    const parsed = novoConsorciadoSchema.safeParse(novoConsorciado);
+    if (!parsed.success) throw new Error(formatZodError(parsed.error));
+
+    const duplicado = findConsorciadoDuplicado(parsed.data.cpf_cnpj);
+    if (duplicado) {
+      throw new Error(
+        `Já existe um consorciado com este CPF/CNPJ (${duplicado.nome}). Use "Usar Existente" para vinculá-lo.`,
+      );
+    }
+
+    const input: ConsorciadoInput = parsed.data;
+    const created = await createConsorciado(input);
+    setConsorciados((prev) => [
+      {
+        id: created.id,
+        nome: created.nome,
+        cpf_cnpj: created.cpf_cnpj,
+        telefone: created.telefone,
+      },
+      ...prev,
+    ]);
+    return created.id;
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setValorTouched(true);
     setError(null);
+
+    if (!consorciadoMode) {
+      setError("Escolha se vai criar um novo consorciado ou usar um existente.");
+      return;
+    }
 
     if (valorError) {
       setError(valorError);
       return;
     }
 
-    let valorCentavos: number | null = null;
+    let valorCentavos: number;
     try {
-      valorCentavos = form.valor.trim() ? parseCurrencyToCentavos(form.valor) : null;
+      valorCentavos = parseValorCreditoToCentavos(form.valor);
     } catch {
-      setError("Valor inválido.");
+      setError("Valor do crédito inválido.");
       return;
     }
-
-    const trimOrNull = (s: string) => {
-      const t = s.trim();
-      return t ? t : null;
-    };
 
     const dataVencimento = Number.parseInt(form.dataVencimento, 10);
-    if (!form.titulo.trim()) {
-      setError("Informe o título da venda.");
-      return;
-    }
-    if (!form.consorciadoId.trim()) {
-      setError("Selecione um consorciado.");
-      return;
-    }
-    if (!form.equipeId.trim()) {
-      setError("Selecione uma equipe.");
-      return;
-    }
-    if (!form.vendedorId.trim()) {
-      setError("Selecione o vendedor responsável.");
-      return;
-    }
-    if (!form.contrato.trim()) {
-      setError("Informe o contrato.");
-      return;
-    }
-    if (!form.grupo.trim()) {
-      setError("Informe o grupo.");
-      return;
-    }
-    if (!form.cota.trim()) {
-      setError("Informe a cota.");
-      return;
-    }
-    if (!Number.isInteger(dataVencimento) || dataVencimento < 1 || dataVencimento > 31) {
-      setError("Informe o dia de vencimento entre 1 e 31.");
+    const operacional = novaVendaOperacionalSchema.safeParse({
+      numeroContrato: form.numeroContrato,
+      grupo: form.grupo,
+      cota: form.cota,
+      dataVencimento,
+      valorCentavos,
+      dataFechamento: form.dataFechamento,
+      mesAnoFechamento: form.mesAnoFechamento,
+      administradoraId: form.administradoraId,
+      planoId: form.planoId,
+      equipeId: form.equipeId,
+      vendedorId: form.vendedorId,
+      statusOperacional: form.statusOperacional,
+    });
+
+    if (!operacional.success) {
+      setError(formatZodError(operacional.error));
       return;
     }
 
     setSaving(true);
     try {
+      const resolvedConsorciadoId = await resolveConsorciadoId();
+      const { data } = operacional;
+
       await createVenda({
-        consorciadoId: form.consorciadoId,
-        equipeId: form.equipeId,
-        vendedorId: form.vendedorId,
-        administradoraId: form.administradoraId,
-        planoId: form.planoId.trim() ? form.planoId.trim() : null,
-        contrato: form.contrato.trim(),
-        grupo: form.grupo.trim(),
-        cota: form.cota.trim(),
-        dataVencimento,
-        titulo: form.titulo.trim(),
-        status: form.status,
-        valorCentavos,
-        dataVenda: form.dataVenda ? new Date(`${form.dataVenda}T00:00:00.000Z`) : null,
-        descricao: trimOrNull(form.descricao),
-        observacoes: trimOrNull(form.observacoes),
+        consorciadoId: resolvedConsorciadoId,
+        equipeId: data.equipeId,
+        vendedorId: data.vendedorId,
+        administradoraId: data.administradoraId,
+        planoId: data.planoId,
+        numeroContrato: data.numeroContrato,
+        grupo: data.grupo,
+        cota: data.cota,
+        dataVencimento: data.dataVencimento,
+        titulo: buildVendaTitulo(data.numeroContrato, data.grupo, data.cota),
+        statusOperacional: data.statusOperacional,
+        valorCentavos: data.valorCentavos,
+        dataVenda: new Date(`${data.dataFechamento}T00:00:00.000Z`),
+        mesAnoFechamento: data.mesAnoFechamento,
+        descricao: null,
+        observacoes: null,
       });
+
       router.push("/vendas");
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Erro ao salvar.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao salvar.");
     } finally {
       setSaving(false);
     }
   }
 
+  const step2Disabled = !consorciadoPronto;
+
   return (
-    <form onSubmit={(e) => void onSubmit(e)} className={`${panelClass()} p-6`}>
-      <div className="text-sm font-medium">Dados da venda (matriz)</div>
-
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <label className="block md:col-span-2">
-          <div className="mb-1 text-xs font-medium text-zinc-600">
-            Consorciado <span className="text-red-600"> *</span>
+    <form onSubmit={(e) => void onSubmit(e)} className={formSectionClass()}>
+      {/* Passo 1 */}
+      <section className="border-b border-zinc-100 p-6 sm:p-8">
+        <div className="flex items-start gap-3">
+          <StepBadge number={1} done={consorciadoPronto} />
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-semibold text-zinc-900">Consorciado</h2>
+            <p className="mt-1 text-sm leading-6 text-zinc-600">
+              Evite duplicidade: busque um cliente existente antes de criar um novo cadastro.
+            </p>
           </div>
-          <ConsorciadoAutocomplete
-            consorciados={consorciados}
-            value={form.consorciadoId}
-            onChange={(consorciadoId) => setForm((p) => ({ ...p, consorciadoId }))}
-            disabled={consorciados.length === 0}
-            required
-          />
-          {consorciados.length === 0 ? (
-            <div className="mt-2 text-xs text-zinc-500">
-              Você precisa cadastrar um consorciado antes.{" "}
-              <Link
-                href="/consorciados/nova"
-                className="font-medium text-zinc-800 underline-offset-2 hover:underline"
-              >
-                Novo consorciado
-              </Link>
-            </div>
-          ) : null}
-        </label>
-
-        <Field
-          label="Contrato"
-          required
-          value={form.contrato}
-          onChange={(v) => setForm((p) => ({ ...p, contrato: v }))}
-          placeholder="Chave matriz do sistema"
-        />
-        <Field
-          label="Grupo"
-          required
-          value={form.grupo}
-          onChange={(v) => setForm((p) => ({ ...p, grupo: v }))}
-          placeholder="Ex.: 1234"
-        />
-        <Field
-          label="Cota"
-          required
-          value={form.cota}
-          onChange={(v) => setForm((p) => ({ ...p, cota: v }))}
-          placeholder="Ex.: 056"
-        />
-        <Field
-          label="Dia de vencimento"
-          required
-          type="number"
-          value={form.dataVencimento}
-          onChange={(v) => setForm((p) => ({ ...p, dataVencimento: v }))}
-          placeholder="1 a 31"
-        />
-
-        <label className="block">
-          <div className="mb-1 text-xs font-medium text-zinc-600">
-            Equipe <span className="text-red-600"> *</span>
-          </div>
-          <select
-            value={form.equipeId}
-            onChange={(e) =>
-              setForm((p) => ({
-                ...p,
-                equipeId: e.target.value,
-                vendedorId: "",
-              }))
-            }
-            className={formControlClass()}
-            disabled={equipes.length === 0}
-            required
-          >
-            {equipes.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.nome}
-              </option>
-            ))}
-          </select>
-          {equipes.length === 0 ? (
-            <div className="mt-2 text-xs text-zinc-500">
-              Cadastre uma equipe em{" "}
-              <Link href="/configuracoes/equipes/nova" className="font-medium underline">
-                Configurações → Equipes
-              </Link>
-            </div>
-          ) : null}
-        </label>
-
-        <label className="block">
-          <div className="mb-1 text-xs font-medium text-zinc-600">
-            Vendedor responsável <span className="text-red-600"> *</span>
-          </div>
-          <select
-            value={form.vendedorId}
-            onChange={(e) => setForm((p) => ({ ...p, vendedorId: e.target.value }))}
-            className={formControlClass()}
-            disabled={!form.equipeId || vendedores.length === 0}
-            required
-          >
-            <option value="">Selecione...</option>
-            {vendedores.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.nome}
-              </option>
-            ))}
-          </select>
-          {form.equipeId && vendedores.length === 0 ? (
-            <div className="mt-2 text-xs text-zinc-500">
-              Nenhum vendedor nesta equipe.{" "}
-              <Link href="/configuracoes/vendedores/nova" className="font-medium underline">
-                Cadastrar vendedor
-              </Link>
-            </div>
-          ) : null}
-        </label>
-
-        <label className="block md:col-span-2">
-          <div className="mb-1 text-xs font-medium text-zinc-600">
-            Administradora <span className="text-red-600"> *</span>
-          </div>
-          <select
-            value={form.administradoraId}
-            onChange={(e) =>
-              setForm((p) => ({
-                ...p,
-                administradoraId: e.target.value,
-                planoId: "",
-              }))
-            }
-            className={formControlClass()}
-            disabled={administradoras.length === 0}
-          >
-            {administradoras.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.nome} ({a.cnpj})
-              </option>
-            ))}
-          </select>
-          {administradoras.length === 0 ? (
-            <div className="mt-2 text-xs text-zinc-500">
-              Você precisa cadastrar uma administradora antes.{" "}
-              <Link
-                href="/administradoras/nova"
-                className="font-medium text-zinc-800 underline-offset-2 hover:underline"
-              >
-                Nova administradora
-              </Link>
-            </div>
-          ) : null}
-        </label>
-
-        <label className="block md:col-span-2">
-          <div className="mb-1 text-xs font-medium text-zinc-600">Plano (opcional)</div>
-          <select
-            value={form.planoId}
-            onChange={(e) => setForm((p) => ({ ...p, planoId: e.target.value }))}
-            className={formControlClass()}
-            disabled={!form.administradoraId || planos.length === 0}
-          >
-            <option value="">Nenhum</option>
-            {planos.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nome} — {p.tipoBem}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <Field
-          label="Título"
-          required
-          value={form.titulo}
-          onChange={(v) => setForm((p) => ({ ...p, titulo: v }))}
-          placeholder="Ex.: Cota Auto — Grupo 1234"
-        />
-
-        <label className="block">
-          <div className="mb-1 text-xs font-medium text-zinc-600">Status</div>
-          <select
-            value={form.status}
-            onChange={(e) => setForm((p) => ({ ...p, status: e.target.value as VendaStatus }))}
-            className={formControlClass()}
-          >
-            <option value="ATIVO">Ativo</option>
-            <option value="INADIMPLENTE">Inadimplente</option>
-            <option value="CANCELADO">Cancelado</option>
-          </select>
-        </label>
-
-        <CurrencyInput
-          label="Valor"
-          value={form.valor}
-          onChange={(v) => setForm((p) => ({ ...p, valor: v }))}
-          error={valorTouched ? valorError : null}
-        />
-
-        <Field
-          label="Data da venda"
-          type="date"
-          value={form.dataVenda}
-          onChange={(v) => setForm((p) => ({ ...p, dataVenda: v }))}
-        />
-      </div>
-
-      <div className="mt-8 text-sm font-medium">Detalhes</div>
-      <div className="mt-3 grid gap-4 md:grid-cols-2">
-        <label className="block md:col-span-2">
-          <div className="mb-1 text-xs font-medium text-zinc-600">Descrição</div>
-          <textarea
-            value={form.descricao}
-            onChange={(e) => setForm((p) => ({ ...p, descricao: e.target.value }))}
-            className="min-h-24 w-full rounded-lg border border-zinc-200 bg-white p-3 text-sm text-zinc-900 shadow-sm outline-none focus-visible:border-zinc-400 focus-visible:ring-2 focus-visible:ring-zinc-300/50"
-          />
-        </label>
-        <label className="block md:col-span-2">
-          <div className="mb-1 text-xs font-medium text-zinc-600">Observações</div>
-          <textarea
-            value={form.observacoes}
-            onChange={(e) => setForm((p) => ({ ...p, observacoes: e.target.value }))}
-            className="min-h-24 w-full rounded-lg border border-zinc-200 bg-white p-3 text-sm text-zinc-900 shadow-sm outline-none focus-visible:border-zinc-400 focus-visible:ring-2 focus-visible:ring-zinc-300/50"
-          />
-        </label>
-      </div>
-
-      {error ? (
-        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          {error}
         </div>
-      ) : null}
 
-      <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
-        <button
-          type="button"
-          onClick={() => router.push("/vendas")}
-          className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-          disabled={saving}
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            className={modeButtonClass(consorciadoMode === "existente")}
+            onClick={() => {
+              setConsorciadoMode("existente");
+              setNovoConsorciado({ nome: "", cpf_cnpj: "", telefone: "", email: "" });
+            }}
+          >
+            Usar Existente
+          </button>
+          <button
+            type="button"
+            className={modeButtonClass(consorciadoMode === "novo")}
+            onClick={() => {
+              setConsorciadoMode("novo");
+              setConsorciadoId("");
+            }}
+          >
+            Criar Novo Consorciado
+          </button>
+        </div>
+
+        {!consorciadoMode ? (
+          <p className="mt-4 rounded-xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+            Selecione uma das opções acima para continuar.
+          </p>
+        ) : null}
+
+        {consorciadoMode === "existente" ? (
+          <div className="relative z-20 mt-5">
+            <label className="block">
+              <div className="mb-1 text-xs font-medium text-zinc-600">
+                Buscar consorciado <span className="text-red-600"> *</span>
+              </div>
+              <ConsorciadoAutocomplete
+                consorciados={consorciados}
+                value={consorciadoId}
+                onChange={setConsorciadoId}
+                disabled={consorciados.length === 0}
+                required
+              />
+            </label>
+            {consorciados.length === 0 ? (
+              <p className="mt-2 text-xs text-zinc-500">
+                Nenhum consorciado cadastrado. Use &quot;Criar Novo Consorciado&quot;.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {consorciadoMode === "novo" ? (
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <Field
+              label="Nome"
+              required
+              value={novoConsorciado.nome}
+              onChange={(v) => setNovoConsorciado((p) => ({ ...p, nome: v }))}
+            />
+            <Field
+              label="CPF / CNPJ"
+              required
+              value={novoConsorciado.cpf_cnpj}
+              onChange={(v) => setNovoConsorciado((p) => ({ ...p, cpf_cnpj: v }))}
+            />
+            <Field
+              label="Telefone"
+              required
+              value={novoConsorciado.telefone}
+              onChange={(v) => setNovoConsorciado((p) => ({ ...p, telefone: v }))}
+            />
+            <Field
+              label="E-mail"
+              required
+              type="email"
+              value={novoConsorciado.email}
+              onChange={(v) => setNovoConsorciado((p) => ({ ...p, email: v }))}
+            />
+          </div>
+        ) : null}
+      </section>
+
+      {/* Passo 2 — sempre visível; desabilitado até o passo 1 estar pronto */}
+      <section className="relative p-6 sm:p-8">
+        <div className="flex items-start gap-3">
+          <StepBadge number={2} done={false} />
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-semibold text-zinc-900">Dados operacionais da venda</h2>
+            <p className="mt-1 text-sm leading-6 text-zinc-600">
+              Contrato, cota, valores e equipe responsável pela venda.
+            </p>
+          </div>
+        </div>
+
+        {step2Disabled ? (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {consorciadoMode === "existente"
+              ? "Selecione um consorciado na busca acima para liberar os campos da venda."
+              : consorciadoMode === null
+                ? "Escolha como vincular o consorciado no passo 1."
+                : "Preencha os dados do novo consorciado ou confirme a seleção para continuar."}
+          </div>
+        ) : null}
+
+        <fieldset
+          disabled={step2Disabled}
+          className={[
+            "mt-5 border-0 p-0",
+            step2Disabled ? "pointer-events-none opacity-45" : "",
+          ].join(" ")}
         >
-          Cancelar
-        </button>
-        <button
-          type="submit"
-          className="inline-flex h-10 items-center justify-center rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
-          disabled={
-            saving ||
-            administradoras.length === 0 ||
-            consorciados.length === 0 ||
-            equipes.length === 0 ||
-            vendedores.length === 0
-          }
-        >
-          {saving ? "Salvando..." : "Salvar"}
-        </button>
-      </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field
+              label="Número do contrato"
+              required
+              value={form.numeroContrato}
+              onChange={(v) => setForm((p) => ({ ...p, numeroContrato: v }))}
+              placeholder="Chave matriz do sistema"
+            />
+            <CurrencyInput
+              label="Valor do crédito"
+              value={form.valor}
+              onChange={(v) => setForm((p) => ({ ...p, valor: v }))}
+              error={valorTouched ? valorError : null}
+              required
+            />
+            <Field
+              label="Grupo"
+              required
+              value={form.grupo}
+              onChange={(v) => setForm((p) => ({ ...p, grupo: v }))}
+              placeholder="Ex.: 1234"
+            />
+            <Field
+              label="Cota"
+              required
+              value={form.cota}
+              onChange={(v) => setForm((p) => ({ ...p, cota: v }))}
+              placeholder="Ex.: 056"
+            />
+            <Field
+              label="Dia de vencimento da parcela"
+              required
+              type="number"
+              value={form.dataVencimento}
+              onChange={(v) => setForm((p) => ({ ...p, dataVencimento: v }))}
+              placeholder="1 a 31"
+            />
+            <Field
+              label="Data de fechamento"
+              required
+              type="date"
+              value={form.dataFechamento}
+              onChange={(v) => setForm((p) => ({ ...p, dataFechamento: v }))}
+            />
+            <Field
+              label="Mês/ano de fechamento"
+              required
+              type="month"
+              value={form.mesAnoFechamento}
+              onChange={(v) => setForm((p) => ({ ...p, mesAnoFechamento: v }))}
+            />
+
+            <label className="block md:col-span-2">
+              <div className="mb-1 text-xs font-medium text-zinc-600">
+                Administradora <span className="text-red-600"> *</span>
+              </div>
+              <select
+                value={form.administradoraId}
+                onChange={(e) =>
+                  setForm((p) => ({
+                    ...p,
+                    administradoraId: e.target.value,
+                    planoId: "",
+                  }))
+                }
+                className={formControlClass()}
+                disabled={administradoras.length === 0}
+                required
+              >
+                {administradoras.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.nome} ({a.cnpj})
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block md:col-span-2">
+              <div className="mb-1 text-xs font-medium text-zinc-600">
+                Plano <span className="text-red-600"> *</span>
+              </div>
+              <select
+                value={form.planoId}
+                onChange={(e) => setForm((p) => ({ ...p, planoId: e.target.value }))}
+                className={formControlClass()}
+                disabled={!form.administradoraId || planos.length === 0}
+                required
+              >
+                <option value="">Selecione...</option>
+                {planos.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nome} — {p.tipoBem}
+                  </option>
+                ))}
+              </select>
+              {form.administradoraId && planos.length === 0 ? (
+                <p className="mt-2 text-xs text-zinc-500">
+                  Nenhum plano para esta administradora.{" "}
+                  <Link href="/planos/nova" className="font-medium underline">
+                    Cadastrar plano
+                  </Link>
+                </p>
+              ) : null}
+            </label>
+
+            <label className="block">
+              <div className="mb-1 text-xs font-medium text-zinc-600">
+                Equipe <span className="text-red-600"> *</span>
+              </div>
+              <select
+                value={form.equipeId}
+                onChange={(e) =>
+                  setForm((p) => ({
+                    ...p,
+                    equipeId: e.target.value,
+                    vendedorId: "",
+                  }))
+                }
+                className={formControlClass()}
+                disabled={equipes.length === 0}
+                required
+              >
+                {equipes.map((eq) => (
+                  <option key={eq.id} value={eq.id}>
+                    {eq.nome}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <div className="mb-1 text-xs font-medium text-zinc-600">
+                Vendedor <span className="text-red-600"> *</span>
+              </div>
+              <select
+                value={form.vendedorId}
+                onChange={(e) => setForm((p) => ({ ...p, vendedorId: e.target.value }))}
+                className={formControlClass()}
+                disabled={!form.equipeId || vendedores.length === 0}
+                required
+              >
+                <option value="">Selecione...</option>
+                {vendedores.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.nome}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <div className="mb-1 text-xs font-medium text-zinc-600">
+                Status <span className="text-red-600"> *</span>
+              </div>
+              <select
+                value={form.statusOperacional}
+                onChange={(e) =>
+                  setForm((p) => ({
+                    ...p,
+                    statusOperacional: e.target.value as StatusOperacionalCota,
+                  }))
+                }
+                className={formControlClass()}
+                required
+              >
+                <option value="ATIVO">Ativo</option>
+                <option value="INADIMPLENTE">Inadimplente</option>
+                <option value="CANCELADO">Cancelado</option>
+              </select>
+            </label>
+          </div>
+        </fieldset>
+      </section>
+
+      <footer className="flex flex-col gap-4 border-t border-zinc-100 bg-zinc-50/80 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+        {error ? (
+          <div className="flex-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </div>
+        ) : (
+          <p className="text-sm text-zinc-500">
+            {consorciadoPronto
+              ? "Revise os dados antes de registrar a venda."
+              : "Complete o passo 1 para habilitar o registro."}
+          </p>
+        )}
+
+        <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={() => router.push("/vendas")}
+            className="inline-flex h-11 items-center justify-center rounded-xl border border-zinc-200 bg-white px-5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+            disabled={saving}
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            className={primaryCtaClass()}
+            disabled={
+              saving ||
+              !consorciadoPronto ||
+              administradoras.length === 0 ||
+              equipes.length === 0
+            }
+          >
+            {saving ? "Salvando..." : "Registrar venda"}
+          </button>
+        </div>
+      </footer>
     </form>
   );
 }

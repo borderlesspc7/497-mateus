@@ -78,8 +78,8 @@ function parseRawRows(rawRows: RawRow[]): ParseImportFileResult {
     seenContratos.set(contrato, linha);
 
     rows.push({
-      contrato,
-      status,
+      numeroContrato: contrato,
+      statusOperacional: status,
       linha,
       parcelasPagasCancelamento: status === "CANCELADO" ? parcelasPagas ?? undefined : undefined,
     });

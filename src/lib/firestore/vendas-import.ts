@@ -1,13 +1,11 @@
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import type { VendaContratoLookup } from "@/lib/firestore/contrato-matriz";
 import { aplicarEstornoCancelamentoVenda } from "@/lib/firestore/estorno-cancelamento";
+import { normalizeVendaFields } from "@/lib/firestore/legacy";
 import { COLLECTIONS, nowIso, type VendaDoc } from "@/lib/firestore/types";
 import type { ImportConfirmItem, ImportConfirmResult } from "@/lib/importacao/types";
 
-export type VendaContratoLookup = {
-  id: string;
-  contrato: string;
-  status: import("@/lib/types/domain").VendaStatus;
-};
+export type { VendaContratoLookup };
 
 export async function buildVendaContratoLookupMap(): Promise<Map<string, VendaContratoLookup>> {
   const snap = await getAdminFirestore().collection(COLLECTIONS.vendas).get();
@@ -15,12 +13,13 @@ export async function buildVendaContratoLookupMap(): Promise<Map<string, VendaCo
 
   for (const doc of snap.docs) {
     const data = doc.data() as VendaDoc;
-    const contrato = data.contrato?.trim();
-    if (!contrato) continue;
-    map.set(contrato, {
+    const normalized = normalizeVendaFields(data);
+    const numeroContrato = normalized.numeroContrato;
+    if (!numeroContrato) continue;
+    map.set(numeroContrato, {
       id: doc.id,
-      contrato,
-      status: data.status,
+      numeroContrato,
+      statusOperacional: normalized.statusOperacional,
     });
   }
 
@@ -47,20 +46,21 @@ export async function batchUpdateVendaStatus(
       continue;
     }
 
-    const current = snap.data() as VendaDoc;
-    if (current.status === item.status) {
+    const current = normalizeVendaFields(snap.data() as VendaDoc);
+    if (current.statusOperacional === item.statusOperacional) {
       skipped += 1;
       continue;
     }
 
-    const isNovoCancelamento = item.status === "CANCELADO" && current.status !== "CANCELADO";
+    const isNovoCancelamento =
+      item.statusOperacional === "CANCELADO" && current.statusOperacional !== "CANCELADO";
     if (isNovoCancelamento) {
       if (
         item.parcelasPagasCancelamento === undefined ||
         item.parcelasPagasCancelamento === null
       ) {
         throw new Error(
-          `Venda ${current.contrato}: informe PARCELAS_PAGAS para cancelamentos importados.`,
+          `Venda ${current.numeroContrato}: informe PARCELAS_PAGAS para cancelamentos importados.`,
         );
       }
       if (
@@ -68,13 +68,14 @@ export async function batchUpdateVendaStatus(
         item.parcelasPagasCancelamento < 0
       ) {
         throw new Error(
-          `Venda ${current.contrato}: PARCELAS_PAGAS inválido.`,
+          `Venda ${current.numeroContrato}: PARCELAS_PAGAS inválido.`,
         );
       }
     }
 
     await ref.update({
-      status: item.status,
+      statusOperacional: item.statusOperacional,
+      status: item.statusOperacional,
       updatedAt: ts,
       ...(isNovoCancelamento
         ? { parcelasPagasCancelamento: item.parcelasPagasCancelamento }

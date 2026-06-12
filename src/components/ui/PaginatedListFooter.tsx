@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { TableSkeleton } from "@/components/ui/Skeleton";
-import { secondaryActionClass } from "@/components/ui/list-panel-classes";
+import { panelInsetClass, secondaryActionClass } from "@/components/ui/list-panel-classes";
 
 type PaginatedListFooterProps = {
   hasMore: boolean;
@@ -41,7 +41,7 @@ export function PaginatedListFooter({
   if (!hasMore && !isLoadingMore) return null;
 
   return (
-    <div className="mt-4 space-y-4">
+    <div className={`mt-2 space-y-4 ${panelInsetClass()}`}>
       {isLoadingMore ? <TableSkeleton rows={skeletonRows} columns={columns} /> : null}
       {hasMore ? (
         <>

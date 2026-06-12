@@ -20,7 +20,7 @@ import {
   tableWrapClass,
 } from "@/components/ui/list-panel-classes";
 import type { VendasListFilters, VendasListPage } from "@/lib/firestore/repository";
-import type { StatusInconsistencia, StatusPosVenda, VendaRow, VendaStatus } from "@/lib/types/domain";
+import type { StatusInconsistencia, StatusOperacionalCota, StatusPosVenda, VendaRow } from "@/lib/types/domain";
 import {
   useVendasPaginatedList,
 } from "@/lib/vendas/use-vendas-paginated-list";
@@ -29,7 +29,7 @@ import { formatMoneyPtBrFromCentavos } from "@/lib/validators/currency";
 
 export type ControleModo = "inadimplencia" | "inconsistencia" | "pos-venda";
 
-const INADIMPLENCIA_DEFAULT_FILTERS: VendasListFilters = { status: "INADIMPLENTE" };
+const INADIMPLENCIA_DEFAULT_FILTERS: VendasListFilters = { statusOperacional: "INADIMPLENTE" };
 const INCONSISTENCIA_DEFAULT_FILTERS: VendasListFilters = { statusInconsistencia: "INCONSISTENTE" };
 const EMPTY_FILTERS: VendasListFilters = {};
 
@@ -48,12 +48,13 @@ type ControleCotasClientProps =
 export default function ControleCotasClient(props: ControleCotasClientProps) {
   const { modo } = props;
 
-  const defaultStatusFilter: "" | VendaStatus = modo === "inadimplencia" ? "INADIMPLENTE" : "";
+  const defaultStatusFilter: "" | StatusOperacionalCota =
+    modo === "inadimplencia" ? "INADIMPLENTE" : "";
   const defaultInconsistenciaFilter: "" | StatusInconsistencia =
     modo === "inconsistencia" ? "INCONSISTENTE" : "";
 
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"" | VendaStatus>(defaultStatusFilter);
+  const [statusFilter, setStatusFilter] = useState<"" | StatusOperacionalCota>(defaultStatusFilter);
   const [inconsistenciaFilter, setInconsistenciaFilter] = useState<"" | StatusInconsistencia>(
     defaultInconsistenciaFilter,
   );
@@ -79,7 +80,7 @@ export default function ControleCotasClient(props: ControleCotasClientProps) {
           return false;
         }
         if (!q) return true;
-        const hay = `${v.contrato} ${v.grupo} ${v.cota} ${v.consorciado?.nome ?? ""} ${v.equipe?.nome ?? ""} ${v.vendedor?.nome ?? ""}`.toLowerCase();
+        const hay = `${v.numeroContrato} ${v.grupo} ${v.cota} ${v.consorciado?.nome ?? ""} ${v.equipe?.nome ?? ""} ${v.vendedor?.nome ?? ""}`.toLowerCase();
         return hay.includes(q);
       });
     },
@@ -127,7 +128,7 @@ export default function ControleCotasClient(props: ControleCotasClientProps) {
 
     const nextFilters: VendasListFilters = {};
     if (modo === "inadimplencia" && statusFilter) {
-      nextFilters.status = statusFilter;
+      nextFilters.statusOperacional = statusFilter;
     }
     if (modo === "inconsistencia" && inconsistenciaFilter) {
       nextFilters.statusInconsistencia = inconsistenciaFilter;
@@ -275,14 +276,14 @@ export default function ControleCotasClient(props: ControleCotasClientProps) {
                       className={`${tableRowClass(index)} cursor-pointer hover:bg-zinc-50/80`}
                       onClick={() => openDrawer(v)}
                     >
-                      <td className={`${tableCellClass()} font-medium text-zinc-900`}>{v.contrato}</td>
+                      <td className={`${tableCellClass()} font-medium text-zinc-900`}>{v.numeroContrato}</td>
                       <td className={tableCellClass()}>
                         {v.grupo} / {v.cota}
                         <div className="text-xs text-zinc-500">Venc. dia {v.dataVencimento}</div>
                       </td>
                       <td className={tableCellClass()}>{v.consorciado?.nome ?? "—"}</td>
                       <td className={tableCellClass()} onClick={(e) => e.stopPropagation()}>
-                        <StatusBadge status={v.status} />
+                        <StatusBadge status={v.statusOperacional} />
                       </td>
                       {modo === "inconsistencia" ? (
                         <td className={tableCellClass()} onClick={(e) => e.stopPropagation()}>
@@ -307,8 +308,8 @@ export default function ControleCotasClient(props: ControleCotasClientProps) {
                             <WhatsAppButton
                               telefone={v.consorciado?.telefone}
                               nomeCliente={v.consorciado?.nome ?? ""}
-                              contrato={v.contrato}
-                              statusVenda={v.status}
+                              numeroContrato={v.numeroContrato}
+                              statusOperacional={v.statusOperacional}
                               vendaId={v.id}
                             />
                           )}

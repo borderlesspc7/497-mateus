@@ -5,7 +5,7 @@ import { PageLoading } from "@/components/ui/PageLoading";
 import ControleCotasClient from "../ui/ControleCotasClient";
 
 async function InadimplenciaData() {
-  const page = await listVendasPaginated({ status: "INADIMPLENTE" });
+  const page = await listVendasPaginated({ statusOperacional: "INADIMPLENTE" });
   return <ControleCotasClient modo="inadimplencia" initialPage={page} />;
 }
 

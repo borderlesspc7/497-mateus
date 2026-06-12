@@ -1,8 +1,8 @@
-import type { VendaStatus } from "@/lib/types/domain";
+import type { StatusOperacionalCota } from "@/lib/types/domain";
 
 export type ImportRowInput = {
-  contrato: string;
-  status: VendaStatus;
+  numeroContrato: string;
+  statusOperacional: StatusOperacionalCota;
   linha: number;
   parcelasPagasCancelamento?: number;
 };
@@ -10,9 +10,9 @@ export type ImportRowInput = {
 export type ImportPreviewMatched = {
   kind: "matched";
   linha: number;
-  contrato: string;
-  statusAtual: VendaStatus;
-  statusNovo: VendaStatus;
+  numeroContrato: string;
+  statusAtual: StatusOperacionalCota;
+  statusNovo: StatusOperacionalCota;
   vendaId: string;
   willUpdate: boolean;
   parcelasPagasCancelamento?: number;
@@ -21,14 +21,14 @@ export type ImportPreviewMatched = {
 export type ImportPreviewNotFound = {
   kind: "not_found";
   linha: number;
-  contrato: string;
-  statusNovo: VendaStatus;
+  numeroContrato: string;
+  statusNovo: StatusOperacionalCota;
 };
 
 export type ImportPreviewInvalid = {
   kind: "invalid";
   linha: number;
-  contrato: string | null;
+  numeroContrato: string | null;
   error: string;
 };
 
@@ -47,7 +47,7 @@ export type ImportPreviewResult = {
 
 export type ImportConfirmItem = {
   vendaId: string;
-  status: VendaStatus;
+  statusOperacional: StatusOperacionalCota;
   parcelasPagasCancelamento?: number;
 };
 

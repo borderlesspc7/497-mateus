@@ -1,7 +1,7 @@
-import type { VendaStatus } from "@/lib/types/domain";
+import type { StatusOperacionalCota } from "@/lib/types/domain";
 
 const STATUS_CONFIG: Record<
-  VendaStatus,
+  StatusOperacionalCota,
   { label: string; className: string }
 > = {
   ATIVO: {
@@ -19,7 +19,7 @@ const STATUS_CONFIG: Record<
 };
 
 type StatusBadgeProps = {
-  status: VendaStatus;
+  status: StatusOperacionalCota;
 };
 
 export function StatusBadge({ status }: StatusBadgeProps) {

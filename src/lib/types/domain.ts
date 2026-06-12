@@ -9,7 +9,19 @@ export type UsuarioRow = {
   updatedAt: string;
 };
 
-export type VendaStatus = "ATIVO" | "INADIMPLENTE" | "CANCELADO";
+/** Status operacional exclusivo da cota/contrato — nunca pertence ao ConsorciadoRow. */
+export type StatusOperacionalCota = "ATIVO" | "INADIMPLENTE" | "CANCELADO";
+
+/** @deprecated Prefira StatusOperacionalCota. Mantido para compatibilidade. */
+export type VendaStatus = StatusOperacionalCota;
+
+/** Identificação da cota vinculada a um contrato (chave matriz do sistema). */
+export type CotaContrato = {
+  numeroContrato: string;
+  grupo: string;
+  cota: string;
+  dataVencimento: number;
+};
 
 export type StatusPosVenda = "PENDENTE" | "FEITO";
 
@@ -95,7 +107,7 @@ export type ExtratoRow = {
   vendedorId: string;
   equipeId: string;
   vendaTitulo: string;
-  vendaContrato: string;
+  numeroContrato: string;
   consorciadoNome: string | null;
   planoNome: string;
   vendedorNome: string | null;
@@ -108,6 +120,7 @@ export type ExtratoRow = {
 
 export type PlanoMini = { id: string; nome: string; tipoBem: string };
 
+/** Perfil do consorciado — sem status operacional (cada cota tem o seu). */
 export type ConsorciadoRow = {
   id: string;
   nome: string;
@@ -153,11 +166,13 @@ export type VendaRow = {
   consorciado: ConsorciadoMini | null;
   equipe: EquipeMini | null;
   vendedor: VendedorMini | null;
-  status: VendaStatus;
+  /** Status operacional da cota — não confundir com perfil do consorciado. */
+  statusOperacional: StatusOperacionalCota;
   statusInconsistencia: StatusInconsistencia;
   statusPosVenda: StatusPosVenda;
   parcelasPagasCancelamento: number | null;
-  contrato: string;
+  /** Chave matriz universal do sistema. */
+  numeroContrato: string;
   grupo: string;
   cota: string;
   dataVencimento: number;
@@ -165,6 +180,8 @@ export type VendaRow = {
   descricao: string | null;
   valorCentavos: number | null;
   dataVenda: string | null;
+  /** Mês/ano de fechamento no formato YYYY-MM. */
+  mesAnoFechamento: string | null;
   observacoes: string | null;
   checklistAtivacao: ChecklistAtivacao;
   dataPendencia: string | null;
@@ -183,7 +200,7 @@ export type DashboardCounts = {
 export type DashboardVendaResumo = {
   id: string;
   titulo: string;
-  status: VendaStatus;
+  statusOperacional: StatusOperacionalCota;
   valorCentavos: number | null;
   dataVenda: string | null;
   consorciadoNome: string | null;

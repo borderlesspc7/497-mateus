@@ -1,9 +1,9 @@
 import type {
   ChecklistAtivacao,
   StatusInconsistencia,
+  StatusOperacionalCota,
   StatusPosVenda,
   TipoRegistroAtendimento,
-  VendaStatus,
 } from "@/lib/types/domain";
 
 export const COLLECTIONS = {
@@ -82,6 +82,8 @@ export type ExtratoTipo = "COMISSAO" | "ESTORNO";
 
 export type ExtratoDoc = {
   vendaId: string;
+  /** Chave matriz desnormalizada para cruzamento direto por contrato. */
+  numeroContrato?: string;
   planoId: string;
   parcelaNumero: number;
   parcelaTotal: number;
@@ -95,6 +97,7 @@ export type ExtratoDoc = {
   updatedAt: string;
 };
 
+/** Cadastro de pessoa — sem status operacional (fica em vendas/cota). */
 export type ConsorciadoDoc = {
   nome: string;
   cpf_cnpj: string;
@@ -125,6 +128,8 @@ export type HistoricoAtendimentoDoc = {
 };
 
 export type HistoricoAtendimentoUniversalDoc = {
+  /** Chave matriz do contrato atendido. */
+  numeroContrato: string;
   dataRegistro: string;
   tipoRegistro: TipoRegistroAtendimento;
   observacao: string;
@@ -136,11 +141,17 @@ export type VendaDoc = {
   consorciadoId: string | null;
   equipeId: string;
   vendedorId: string;
-  status: VendaStatus;
+  /** Status operacional da cota — nunca no documento do consorciado. */
+  statusOperacional: StatusOperacionalCota;
+  /** @deprecated Espelho de statusOperacional para queries legadas. */
+  status?: StatusOperacionalCota;
   statusInconsistencia: StatusInconsistencia;
   statusPosVenda: StatusPosVenda;
   parcelasPagasCancelamento: number | null;
-  contrato: string;
+  /** Chave matriz universal do sistema. */
+  numeroContrato: string;
+  /** @deprecated Espelho de numeroContrato para documentos legados. */
+  contrato?: string;
   grupo: string;
   cota: string;
   dataVencimento: number;
@@ -148,6 +159,8 @@ export type VendaDoc = {
   descricao: string | null;
   valorCentavos: number | null;
   dataVenda: string | null;
+  /** Mês/ano de fechamento no formato YYYY-MM. */
+  mesAnoFechamento: string | null;
   /** Data do contrato usada para ordenação e paginação (dataVenda ?? createdAt). */
   dataContrato: string;
   observacoes: string | null;

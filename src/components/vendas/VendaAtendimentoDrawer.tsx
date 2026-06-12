@@ -172,7 +172,12 @@ export function VendaAtendimentoDrawer({
     setSavingRegistro(true);
     try {
       const tipo = showPosVendaControls ? ("POS_VENDA" as const) : tipoRegistro;
-      await addHistoricoAtendimentoUniversal(venda.id, tipo, observacao);
+      await addHistoricoAtendimentoUniversal(
+        venda.id,
+        venda.numeroContrato,
+        tipo,
+        observacao,
+      );
 
       if (showPosVendaControls && marcarPosVendaFeito && statusPosVenda !== "FEITO") {
         const updated = await updateVendaStatusPosVenda(venda.id, "FEITO");
@@ -231,7 +236,7 @@ export function VendaAtendimentoDrawer({
                 id="venda-atendimento-modal-title"
                 className="mt-0.5 truncate text-lg font-semibold text-zinc-900"
               >
-                {venda.contrato}
+                {venda.numeroContrato}
               </h2>
               <p className="mt-1 text-sm text-zinc-600">
                 Grupo {venda.grupo} · Cota {venda.cota} · Venc. dia {venda.dataVencimento}
@@ -247,7 +252,7 @@ export function VendaAtendimentoDrawer({
             </button>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <StatusBadge status={venda.status} />
+            <StatusBadge status={venda.statusOperacional} />
             <InconsistenciaBadge status={statusInconsistencia} />
             {showPosVendaControls ? <PosVendaBadge status={statusPosVenda} /> : null}
           </div>

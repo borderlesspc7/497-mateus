@@ -1,19 +1,22 @@
-import type { VendaStatus } from "@/lib/types/domain";
+import { normalizeNumeroContrato } from "@/lib/firestore/contrato-matriz";
+import type { StatusOperacionalCota } from "@/lib/types/domain";
 
-const VALID_STATUSES: VendaStatus[] = ["ATIVO", "INADIMPLENTE", "CANCELADO"];
+const VALID_STATUSES: StatusOperacionalCota[] = ["ATIVO", "INADIMPLENTE", "CANCELADO"];
 
-export function parseImportStatus(raw: unknown): VendaStatus | null {
+export function parseImportStatus(raw: unknown): StatusOperacionalCota | null {
   if (typeof raw !== "string" && typeof raw !== "number") return null;
   const normalized = String(raw).trim().toUpperCase();
   if (!normalized) return null;
-  return VALID_STATUSES.includes(normalized as VendaStatus)
-    ? (normalized as VendaStatus)
+  return VALID_STATUSES.includes(normalized as StatusOperacionalCota)
+    ? (normalized as StatusOperacionalCota)
     : null;
 }
 
-export function normalizeContrato(raw: unknown): string {
-  if (raw === null || raw === undefined) return "";
-  return String(raw).trim();
+/** @deprecated Use normalizeNumeroContrato */
+export const normalizeContrato = normalizeNumeroContrato;
+
+export function normalizeNumeroContratoImport(raw: unknown): string {
+  return normalizeNumeroContrato(raw);
 }
 
 export function findColumnKey(
@@ -28,7 +31,12 @@ export function findColumnKey(
   return null;
 }
 
-export const CONTRATO_COLUMN_CANDIDATES = ["CONTRATO"];
+export const CONTRATO_COLUMN_CANDIDATES = [
+  "NUMERO_CONTRATO",
+  "NÚMERO DO CONTRATO",
+  "NUMERO DO CONTRATO",
+  "CONTRATO",
+];
 export const STATUS_COLUMN_CANDIDATES = ["STATUS"];
 export const PARCELAS_PAGAS_COLUMN_CANDIDATES = ["PARCELAS_PAGAS", "PARCELAS PAGAS"];
 

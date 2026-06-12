@@ -42,7 +42,7 @@ export default function VendasClient({
 }: VendasClientProps) {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<"" | VendaRow["status"]>("");
+  const [statusOperacional, setStatusOperacional] = useState<"" | VendaRow["statusOperacional"]>("");
   const [administradoraId, setAdministradoraId] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -65,7 +65,7 @@ export default function VendasClient({
         const q = query.trim().toLowerCase();
         return items.filter((v) => {
           if (!q) return true;
-          const hay = `${v.titulo} ${v.contrato} ${v.grupo} ${v.cota} ${v.consorciado?.nome ?? ""} ${v.consorciado?.cpf_cnpj ?? ""} ${v.administradora?.nome ?? ""} ${v.plano?.nome ?? ""}`.toLowerCase();
+          const hay = `${v.titulo} ${v.numeroContrato} ${v.grupo} ${v.cota} ${v.consorciado?.nome ?? ""} ${v.consorciado?.cpf_cnpj ?? ""} ${v.administradora?.nome ?? ""} ${v.plano?.nome ?? ""}`.toLowerCase();
           return hay.includes(q);
         });
       },
@@ -77,7 +77,7 @@ export default function VendasClient({
 
   useEffect(() => {
     const nextFilters = {
-      ...(status ? { status } : {}),
+      ...(statusOperacional ? { statusOperacional } : {}),
       ...(administradoraId ? { administradoraId } : {}),
     };
 
@@ -87,7 +87,7 @@ export default function VendasClient({
     }
 
     void resetAndFetch(nextFilters);
-  }, [status, administradoraId, resetAndFetch]);
+  }, [statusOperacional, administradoraId, resetAndFetch]);
 
   async function onDelete(id: string) {
     if (!confirm("Excluir venda?")) return;
@@ -105,7 +105,7 @@ export default function VendasClient({
   }
 
   const showEmpty = !isResetting && visibleItems.length === 0;
-  const hasServerFilters = Boolean(status || administradoraId);
+  const hasServerFilters = Boolean(statusOperacional || administradoraId);
 
   return (
     <DataListPanel
@@ -130,8 +130,8 @@ export default function VendasClient({
             ))}
           </select>
           <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as typeof status)}
+            value={statusOperacional}
+            onChange={(e) => setStatusOperacional(e.target.value as typeof statusOperacional)}
             className={formControlClass("sm")}
           >
             <option value="">Todos status</option>
@@ -197,7 +197,7 @@ export default function VendasClient({
               <tbody>
                 {visibleItems.map((v, index) => (
                   <tr key={v.id} className={tableRowClass(index)}>
-                    <td className={`${tableCellClass()} font-medium text-zinc-900`}>{v.contrato}</td>
+                    <td className={`${tableCellClass()} font-medium text-zinc-900`}>{v.numeroContrato}</td>
                     <td className={tableCellClass()}>
                       <div className="leading-5">
                         <div className="text-zinc-900">
@@ -258,7 +258,7 @@ export default function VendasClient({
                       </div>
                     </td>
                     <td className={tableCellClass()}>
-                      <StatusBadge status={v.status} />
+                      <StatusBadge status={v.statusOperacional} />
                     </td>
                     <td className={tableCellClass()}>
                       <PendenciaBadge venda={v} />

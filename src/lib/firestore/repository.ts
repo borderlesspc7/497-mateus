@@ -8,7 +8,12 @@ import {
 } from "@/lib/dashboard/ranking";
 import { buildDashboardStats } from "@/lib/dashboard/stats";
 import { DEFAULT_CHECKLIST_ATIVACAO, DEFAULT_STATUS_POS_VENDA } from "@/lib/vendas/pos-venda";
-import { normalizeVendaFields, resolveDataContrato } from "@/lib/firestore/legacy";
+import { withNumeroContratoFields } from "@/lib/firestore/contrato-matriz";
+import {
+  normalizeVendaFields,
+  resolveDataContrato,
+  withStatusOperacionalFields,
+} from "@/lib/firestore/legacy";
 import { resolvePlanoRegrasFinanceiras } from "@/lib/planos/regras-financeiras";
 import {
   COLLECTIONS,
@@ -57,7 +62,7 @@ import type {
   PlanoRow,
   StatusInconsistencia,
   VendaRow,
-  VendaStatus,
+  StatusOperacionalCota,
   VendedorMini,
   VendedorRow,
 } from "@/lib/types/domain";
@@ -510,6 +515,7 @@ function normalizeVendaDoc(raw: DocWithId<VendaDoc>): DocWithId<VendaDoc> {
     alertaAtivo: raw.alertaAtivo ?? false,
     statusPosVenda: fields.statusPosVenda,
     parcelasPagasCancelamento: fields.parcelasPagasCancelamento,
+    mesAnoFechamento: raw.mesAnoFechamento ?? null,
   };
 }
 
@@ -528,7 +534,7 @@ function withVendaPosVendaDefaults(data: VendaCreateInput): Omit<VendaDoc, "crea
 export const VENDAS_PAGE_SIZE = 50;
 
 export type VendasListFilters = {
-  status?: VendaStatus;
+  statusOperacional?: StatusOperacionalCota;
   statusInconsistencia?: StatusInconsistencia;
   administradoraId?: string;
 };
@@ -584,8 +590,8 @@ function buildVendasPaginatedQuery(filters: VendasListFilters) {
   if (filters.administradoraId) {
     q = q.where("administradoraId", "==", filters.administradoraId);
   }
-  if (filters.status) {
-    q = q.where("status", "==", filters.status);
+  if (filters.statusOperacional) {
+    q = q.where("status", "==", filters.statusOperacional);
   }
   if (filters.statusInconsistencia) {
     q = q.where("statusInconsistencia", "==", filters.statusInconsistencia);
@@ -672,6 +678,29 @@ export async function listVendasPosVendaControle(): Promise<VendaRow[]> {
   );
 }
 
+export async function getVendaByNumeroContrato(numeroContrato: string): Promise<VendaRow | null> {
+  const normalized = numeroContrato.trim();
+  if (!normalized) return null;
+
+  let snap = await db()
+    .collection(COLLECTIONS.vendas)
+    .where("numeroContrato", "==", normalized)
+    .limit(1)
+    .get();
+
+  if (snap.empty) {
+    snap = await db()
+      .collection(COLLECTIONS.vendas)
+      .where("contrato", "==", normalized)
+      .limit(1)
+      .get();
+  }
+
+  const doc = snap.docs[0];
+  if (!doc) return null;
+  return getVenda(doc.id);
+}
+
 export async function getVenda(id: string): Promise<VendaRow | null> {
   const snap = await db().collection(COLLECTIONS.vendas).doc(id).get();
   if (!snap.exists) return null;
@@ -731,8 +760,12 @@ export async function createVenda(
   const ts = nowIso();
   const id = newId();
   const dataContrato = resolveDataContrato({ dataVenda: data.dataVenda, createdAt: ts });
+  const matriz = withNumeroContratoFields(data.numeroContrato);
+  const statusFields = withStatusOperacionalFields(data.statusOperacional);
   const doc: VendaDoc = {
     ...withVendaPosVendaDefaults(data),
+    ...matriz,
+    ...statusFields,
     dataContrato,
     createdAt: ts,
     updatedAt: ts,
@@ -784,9 +817,16 @@ export async function updateVenda(
   const { id: _id, ...currentData } = current;
   const nextDataVenda =
     patch.dataVenda !== undefined ? patch.dataVenda : currentData.dataVenda;
+  const patchEntries = Object.fromEntries(
+    Object.entries(patch).filter(([, v]) => v !== undefined),
+  ) as Partial<VendaDoc>;
+  const nextNumeroContrato = patch.numeroContrato ?? current.numeroContrato;
+  const nextStatusOperacional = patch.statusOperacional ?? current.statusOperacional;
   const next: VendaDoc = {
     ...currentData,
-    ...Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)),
+    ...patchEntries,
+    ...withNumeroContratoFields(nextNumeroContrato),
+    ...withStatusOperacionalFields(nextStatusOperacional),
     dataContrato: resolveDataContrato({
       dataVenda: nextDataVenda,
       createdAt: current.createdAt,
@@ -883,7 +923,7 @@ export async function syncExtratosComissao(): Promise<number> {
 
   for (const raw of vendas) {
     const venda = normalizeVendaDoc(raw);
-    if (!vendaGeraExtratosComissao(venda.status) || !venda.planoId) continue;
+    if (!vendaGeraExtratosComissao(venda.statusOperacional) || !venda.planoId) continue;
 
     const plano = planoMap.get(venda.planoId);
     if (!plano) continue;
@@ -907,6 +947,7 @@ export async function syncExtratosComissao(): Promise<number> {
 
       const doc: ExtratoDoc = {
         vendaId: venda.id,
+        numeroContrato: venda.numeroContrato,
         planoId: plano.id,
         parcelaNumero: parcela.numero,
         parcelaTotal: regras.parcelasRecebimento,
@@ -948,10 +989,10 @@ export async function syncExtratosComissao(): Promise<number> {
     const dataReferencia = venda.dataVenda ?? venda.updatedAt;
 
     const deveEstornar =
-      !vendaGeraExtratosComissao(venda.status) &&
+      !vendaGeraExtratosComissao(venda.statusOperacional) &&
       regras &&
       extratoDeveSerEstornado(
-        venda.status,
+        venda.statusOperacional,
         dataReferencia,
         regras.diasParaEstorno,
         extrato.status,
@@ -1005,7 +1046,7 @@ export async function listExtratosComissao(): Promise<ExtratoRow[]> {
       vendedorId: extrato.vendedorId,
       equipeId: extrato.equipeId,
       vendaTitulo: venda.titulo,
-      vendaContrato: venda.contrato,
+      numeroContrato: extrato.numeroContrato || venda.numeroContrato,
       consorciadoNome: venda.consorciado?.nome ?? null,
       planoNome: plano.nome,
       vendedorNome: venda.vendedor?.nome ?? null,
@@ -1020,7 +1061,7 @@ export async function listExtratosComissao(): Promise<ExtratoRow[]> {
   return rows.sort(
     (a, b) =>
       b.updatedAt.localeCompare(a.updatedAt) ||
-      a.vendaContrato.localeCompare(b.vendaContrato) ||
+      a.numeroContrato.localeCompare(b.numeroContrato) ||
       a.parcelaNumero - b.parcelaNumero,
   );
 }

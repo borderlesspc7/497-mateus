@@ -18,7 +18,7 @@ import {
   updateVenda as updateVendaDoc,
 } from "@/lib/firestore/repository";
 import { aplicarEstornoCancelamentoVenda } from "@/lib/firestore/estorno-cancelamento";
-import type { StatusInconsistencia, StatusPosVenda, VendaRow, VendaStatus } from "@/lib/types/domain";
+import type { StatusInconsistencia, StatusOperacionalCota, StatusPosVenda, VendaRow } from "@/lib/types/domain";
 import type { VendasListFilters, VendasListPage } from "@/lib/firestore/repository";
 
 export type VendaInput = {
@@ -27,8 +27,8 @@ export type VendaInput = {
   consorciadoId: string;
   equipeId: string;
   vendedorId: string;
-  status: VendaStatus;
-  contrato: string;
+  statusOperacional: StatusOperacionalCota;
+  numeroContrato: string;
   grupo: string;
   cota: string;
   dataVencimento: number;
@@ -36,18 +36,36 @@ export type VendaInput = {
   descricao: string | null;
   valorCentavos: number | null;
   dataVenda: Date | null;
+  mesAnoFechamento: string | null;
   observacoes: string | null;
   statusInconsistencia?: StatusInconsistencia;
   parcelasPagasCancelamento?: number | null;
 };
 
+function assertNovaVendaRequiredFields(data: {
+  planoId: string | null;
+  valorCentavos: number | null;
+  dataVenda: Date | null;
+  mesAnoFechamento: string | null;
+}): void {
+  if (!data.planoId?.trim()) throw new Error("Selecione o plano.");
+  if (data.valorCentavos === null || data.valorCentavos <= 0) {
+    throw new Error("Informe o valor do crédito.");
+  }
+  if (!data.dataVenda) throw new Error("Informe a data de fechamento.");
+  if (!data.mesAnoFechamento?.trim()) throw new Error("Informe o mês/ano de fechamento.");
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(data.mesAnoFechamento.trim())) {
+    throw new Error("Mês/ano de fechamento inválido.");
+  }
+}
+
 function assertVendaMatrizFields(data: {
-  contrato: string;
+  numeroContrato: string;
   grupo: string;
   cota: string;
   dataVencimento: number;
 }): void {
-  if (!data.contrato.trim()) throw new Error("Informe o contrato.");
+  if (!data.numeroContrato.trim()) throw new Error("Informe o número do contrato.");
   if (!data.grupo.trim()) throw new Error("Informe o grupo.");
   if (!data.cota.trim()) throw new Error("Informe a cota.");
   if (!Number.isInteger(data.dataVencimento) || data.dataVencimento < 1 || data.dataVencimento > 31) {
@@ -126,6 +144,7 @@ export async function createVenda(data: VendaInput): Promise<VendaRow> {
   if (!titulo) throw new Error("Informe o título da venda.");
   if (!data.consorciadoId.trim()) throw new Error("Selecione um consorciado.");
   assertVendaMatrizFields(data);
+  assertNovaVendaRequiredFields(data);
 
   await assertAdministradoraExists(data.administradoraId);
   await assertPlanoBelongs(data.planoId, data.administradoraId);
@@ -138,8 +157,8 @@ export async function createVenda(data: VendaInput): Promise<VendaRow> {
     consorciadoId: data.consorciadoId,
     equipeId: data.equipeId,
     vendedorId: data.vendedorId,
-    status: data.status,
-    contrato: data.contrato.trim(),
+    statusOperacional: data.statusOperacional,
+    numeroContrato: data.numeroContrato.trim(),
     grupo: data.grupo.trim(),
     cota: data.cota.trim(),
     dataVencimento: data.dataVencimento,
@@ -147,6 +166,7 @@ export async function createVenda(data: VendaInput): Promise<VendaRow> {
     descricao: data.descricao,
     valorCentavos: data.valorCentavos,
     dataVenda: data.dataVenda ? data.dataVenda.toISOString() : null,
+    mesAnoFechamento: data.mesAnoFechamento?.trim() ?? null,
     observacoes: data.observacoes,
     statusInconsistencia: data.statusInconsistencia ?? "CONSISTENTE",
   });
@@ -220,13 +240,13 @@ export async function updateVenda(id: string, patch: Partial<VendaInput>): Promi
   }
 
   if (
-    patch.contrato !== undefined ||
+    patch.numeroContrato !== undefined ||
     patch.grupo !== undefined ||
     patch.cota !== undefined ||
     patch.dataVencimento !== undefined
   ) {
     assertVendaMatrizFields({
-      contrato: patch.contrato ?? current.contrato,
+      numeroContrato: patch.numeroContrato ?? current.numeroContrato,
       grupo: patch.grupo ?? current.grupo,
       cota: patch.cota ?? current.cota,
       dataVencimento: patch.dataVencimento ?? current.dataVencimento,
@@ -234,8 +254,8 @@ export async function updateVenda(id: string, patch: Partial<VendaInput>): Promi
   }
 
   const sessionUser = await requireServerSessionUser();
-  const statusAnterior = current.status;
-  const statusNovo = data.status ?? current.status;
+  const statusAnterior = current.statusOperacional;
+  const statusNovo = data.statusOperacional ?? current.statusOperacional;
   const isNovoCancelamento = statusNovo === "CANCELADO" && statusAnterior !== "CANCELADO";
 
   if (isNovoCancelamento) {
@@ -259,8 +279,8 @@ export async function updateVenda(id: string, patch: Partial<VendaInput>): Promi
     consorciadoId: data.consorciadoId,
     equipeId: data.equipeId,
     vendedorId: data.vendedorId,
-    status: data.status,
-    contrato: patch.contrato?.trim(),
+    statusOperacional: data.statusOperacional,
+    numeroContrato: patch.numeroContrato?.trim(),
     grupo: patch.grupo?.trim(),
     cota: patch.cota?.trim(),
     dataVencimento: patch.dataVencimento,
@@ -278,7 +298,7 @@ export async function updateVenda(id: string, patch: Partial<VendaInput>): Promi
     parcelasPagasCancelamento: patch.parcelasPagasCancelamento,
   });
 
-  if (patch.status !== undefined && statusNovo !== statusAnterior) {
+  if (patch.statusOperacional !== undefined && statusNovo !== statusAnterior) {
     await writeAuditLog({
       userId: sessionUser.uid,
       acao: `venda.status.${statusAnterior.toLowerCase()}_para_${statusNovo.toLowerCase()}`,

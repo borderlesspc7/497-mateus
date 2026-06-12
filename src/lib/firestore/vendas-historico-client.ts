@@ -73,14 +73,18 @@ export function subscribeHistoricoAtendimentoUniversal(
 
 export async function addHistoricoAtendimentoUniversal(
   vendaId: string,
+  numeroContrato: string,
   tipoRegistro: TipoRegistroAtendimento,
   observacao: string,
 ): Promise<void> {
   const trimmed = observacao.trim();
   if (!trimmed) throw new Error("Informe a observação do registro.");
+  const contrato = numeroContrato.trim();
+  if (!contrato) throw new Error("Informe o número do contrato.");
 
   const db = await getDb();
   const docData: HistoricoAtendimentoUniversalDoc = {
+    numeroContrato: contrato,
     dataRegistro: nowIso(),
     tipoRegistro,
     observacao: trimmed,

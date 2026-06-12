@@ -63,10 +63,10 @@ export function buildDashboardStats(
   nPlanos: number,
   extratos: DocWithId<ExtratoDoc>[],
 ): DashboardStats {
-  const vendasAtivas = vendas.filter((v) => v.status === "ATIVO");
+  const vendasAtivas = vendas.filter((v) => v.statusOperacional === "ATIVO");
   const nVendasAtivas = vendasAtivas.length;
-  const nVendasInadimplentes = vendas.filter((v) => v.status === "INADIMPLENTE").length;
-  const nVendasCanceladas = vendas.filter((v) => v.status === "CANCELADO").length;
+  const nVendasInadimplentes = vendas.filter((v) => v.statusOperacional === "INADIMPLENTE").length;
+  const nVendasCanceladas = vendas.filter((v) => v.statusOperacional === "CANCELADO").length;
 
   const vendasComValor = vendas.filter((v) => v.valorCentavos !== null);
   const valorTotalCentavos = sumValores(vendas);
@@ -116,7 +116,7 @@ export function buildDashboardStats(
     .map((v) => ({
       id: v.id,
       titulo: v.titulo,
-      status: v.status,
+      statusOperacional: v.statusOperacional,
       valorCentavos: v.valorCentavos,
       dataVenda: v.dataVenda,
       consorciadoNome: v.consorciado?.nome ?? null,

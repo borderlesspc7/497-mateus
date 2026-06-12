@@ -9,7 +9,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { ensureFirebaseAuth, getClientFirestore } from "@/lib/firebase/client";
-import { readConsorciadoCpfCnpj } from "@/lib/firestore/legacy";
+import { readConsorciadoCpfCnpj, sanitizeConsorciadoDoc } from "@/lib/firestore/legacy";
 import {
   COLLECTIONS,
   newId,
@@ -106,7 +106,7 @@ export async function updateConsorciado(
   const snap = await getDoc(ref);
   if (!snap.exists()) throw new Error("Consorciado não encontrado.");
 
-  const current = snap.data() as ConsorciadoDoc;
+  const current = sanitizeConsorciadoDoc(snap.data() as ConsorciadoDoc);
   const next: ConsorciadoDoc = {
     ...current,
     nome: data.nome,

@@ -66,12 +66,12 @@ export default function EditarVendaForm({
     vendedorId: item.vendedorId ?? "",
     administradoraId: item.administradoraId,
     planoId: item.planoId ?? "",
-    contrato: item.contrato,
+    numeroContrato: item.numeroContrato,
     grupo: item.grupo,
     cota: item.cota,
     dataVencimento: String(item.dataVencimento),
     titulo: item.titulo,
-    status: item.status,
+    statusOperacional: item.statusOperacional,
     valor: formatCentavosToCurrencyInput(item.valorCentavos),
     dataVenda: dateToInputValue(item.dataVenda),
     descricao: item.descricao ?? "",
@@ -188,8 +188,8 @@ export default function EditarVendaForm({
     }
 
     const dataVencimento = Number.parseInt(form.dataVencimento, 10);
-    if (!form.contrato.trim()) {
-      setError("Informe o contrato.");
+    if (!form.numeroContrato.trim()) {
+      setError("Informe o número do contrato.");
       setSaving(false);
       return;
     }
@@ -216,12 +216,12 @@ export default function EditarVendaForm({
         vendedorId: form.vendedorId,
         administradoraId: form.administradoraId,
         planoId: form.planoId.trim() ? form.planoId.trim() : null,
-        contrato: form.contrato.trim(),
+        numeroContrato: form.numeroContrato.trim(),
         grupo: form.grupo.trim(),
         cota: form.cota.trim(),
         dataVencimento,
         titulo: form.titulo.trim(),
-        status: form.status,
+        statusOperacional: form.statusOperacional,
         valorCentavos,
         dataVenda: form.dataVenda ? new Date(`${form.dataVenda}T00:00:00.000Z`) : null,
         descricao: trimOrNull(form.descricao),
@@ -248,7 +248,8 @@ export default function EditarVendaForm({
       return;
     }
 
-    const isNovoCancelamento = form.status === "CANCELADO" && item.status !== "CANCELADO";
+    const isNovoCancelamento =
+      form.statusOperacional === "CANCELADO" && item.statusOperacional !== "CANCELADO";
     if (isNovoCancelamento) {
       setCancelModalOpen(true);
       return;
@@ -307,8 +308,8 @@ export default function EditarVendaForm({
               Contrato <span className="text-red-600">*</span>
             </div>
             <input
-              value={form.contrato}
-              onChange={(e) => setForm((p) => ({ ...p, contrato: e.target.value }))}
+              value={form.numeroContrato}
+              onChange={(e) => setForm((p) => ({ ...p, numeroContrato: e.target.value }))}
               className={formControlClass()}
             />
           </label>
@@ -443,9 +444,12 @@ export default function EditarVendaForm({
           <label className="block">
             <div className="mb-1 text-xs font-medium text-zinc-600">Status</div>
             <select
-              value={form.status}
+              value={form.statusOperacional}
               onChange={(e) =>
-                setForm((p) => ({ ...p, status: e.target.value as VendaRow["status"] }))
+                setForm((p) => ({
+                  ...p,
+                  statusOperacional: e.target.value as VendaRow["statusOperacional"],
+                }))
               }
               className={formControlClass()}
             >
@@ -521,7 +525,7 @@ export default function EditarVendaForm({
 
       <CancelamentoEstornoModal
         open={cancelModalOpen}
-        contrato={form.contrato.trim() || item.contrato}
+        numeroContrato={form.numeroContrato.trim() || item.numeroContrato}
         saving={saving}
         onClose={() => setCancelModalOpen(false)}
         onConfirm={(parcelasPagas) => void executeSave(parcelasPagas)}

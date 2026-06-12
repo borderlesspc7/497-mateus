@@ -2,17 +2,15 @@ import Link from "next/link";
 import { listConsorciadosMini } from "@/actions/consorciados";
 import { listAdministradoras } from "@/actions/administradoras";
 import { listEquipesMini } from "@/actions/equipes";
-import { listVendedoresMini } from "@/actions/vendedores";
 import { backLinkClass } from "@/components/page-flow/button-classes";
 import { PageFlowHeader } from "@/components/page-flow/PageFlowHeader";
 import NovaVendaForm from "../ui/NovaVendaForm";
 
 export default async function NovaVendaPage() {
-  const [administradoras, consorciados, equipes, vendedores] = await Promise.all([
+  const [administradoras, consorciados, equipes] = await Promise.all([
     listAdministradoras(),
     listConsorciadosMini(),
     listEquipesMini(),
-    listVendedoresMini(),
   ]);
 
   return (
@@ -24,7 +22,7 @@ export default async function NovaVendaPage() {
           { label: "Nova venda" },
         ]}
         title="Nova venda"
-        description="Cadastre uma venda vinculada a um consorciado, administradora e, opcionalmente, a um plano."
+        description="Vincule um consorciado existente ou crie um novo, depois registre o contrato/cota com todos os dados operacionais."
         actions={
           <Link href="/vendas" className={backLinkClass()}>
             Voltar à lista
@@ -40,7 +38,6 @@ export default async function NovaVendaPage() {
         }))}
         consorciados={consorciados}
         equipes={equipes}
-        vendedores={vendedores}
       />
     </>
   );

@@ -319,7 +319,7 @@ export function AppShell({ children }: PropsWithChildren) {
             </div>
           ) : null}
 
-          <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-8 sm:px-8 sm:py-10 lg:px-10">
+          <main className="mx-auto w-full max-w-[100rem] flex-1 px-4 py-6 sm:px-6 lg:px-8 xl:py-8">
             {children}
           </main>
         </div>

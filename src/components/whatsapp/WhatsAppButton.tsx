@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { addHistoricoAtendimentoUniversal } from "@/lib/firestore/vendas-historico-client";
-import type { VendaStatus } from "@/lib/types/domain";
+import type { StatusOperacionalCota } from "@/lib/types/domain";
 import { formatPhoneForWhatsApp } from "@/lib/whatsapp/phone";
 import { buildWhatsAppMessage, buildWhatsAppUrl } from "@/lib/whatsapp/templates";
 
@@ -11,8 +11,8 @@ const HISTORICO_OBSERVACAO = "Mensagem automática iniciada via WhatsApp.";
 type WhatsAppButtonProps = {
   telefone: string | null | undefined;
   nomeCliente: string;
-  contrato?: string;
-  statusVenda?: VendaStatus;
+  numeroContrato?: string;
+  statusOperacional?: StatusOperacionalCota;
   vendaId?: string;
   className?: string;
   title?: string;
@@ -34,8 +34,8 @@ function WhatsAppIcon({ className }: { className?: string }) {
 export function WhatsAppButton({
   telefone,
   nomeCliente,
-  contrato = "",
-  statusVenda = "ATIVO",
+  numeroContrato = "",
+  statusOperacional = "ATIVO",
   vendaId,
   className = "",
   title = "Enviar mensagem via WhatsApp",
@@ -49,18 +49,19 @@ export function WhatsAppButton({
 
     const message = buildWhatsAppMessage({
       nomeCliente,
-      contrato,
-      statusVenda,
+      numeroContrato,
+      statusOperacional,
     });
     const url = buildWhatsAppUrl(formattedPhone, message);
     window.open(url, "_blank", "noopener,noreferrer");
 
-    if (!vendaId) return;
+    if (!vendaId || !numeroContrato.trim()) return;
 
     setIsLogging(true);
     try {
       await addHistoricoAtendimentoUniversal(
         vendaId,
+        numeroContrato,
         "COBRANCA_WHATSAPP",
         HISTORICO_OBSERVACAO,
       );

@@ -355,8 +355,8 @@ export function DashboardHome({ stats, userRole }: DashboardHomeProps) {
         />
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-3">
-        <section className={`${panelClass()} p-6 lg:col-span-2`}>
+      <div className="mt-8 grid gap-6 xl:grid-cols-5">
+        <section className={`${panelClass()} p-5 sm:p-6 xl:col-span-3`}>
           <SectionTitle
             title="Vendas nos últimos 6 meses"
             description="Quantidade e valor por mês (data da venda ou cadastro)."
@@ -406,7 +406,7 @@ export function DashboardHome({ stats, userRole }: DashboardHomeProps) {
           </div>
         </section>
 
-        <section className={`${panelClass()} p-6`}>
+        <section className={`${panelClass()} p-5 sm:p-6 xl:col-span-2`}>
           <SectionTitle
             title="Vendas por status"
             description="Distribuição do pipeline comercial."
@@ -436,9 +436,9 @@ export function DashboardHome({ stats, userRole }: DashboardHomeProps) {
         </section>
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        <section className={`${panelClass()} p-6`}>
-          <div className="flex items-start justify-between gap-4">
+      <div className="mt-8 grid gap-6 xl:grid-cols-2">
+        <section className={panelClass()}>
+          <div className="flex items-start justify-between gap-4 p-5 sm:p-6">
             <SectionTitle
               title="Vendas recentes"
               description="Últimas movimentações registradas."
@@ -452,7 +452,7 @@ export function DashboardHome({ stats, userRole }: DashboardHomeProps) {
           </div>
 
           {stats.vendasRecentes.length === 0 ? (
-            <div className="mt-6">
+            <div className="px-5 pb-5 sm:px-6">
               <EmptyState
                 title="Nenhuma venda cadastrada"
                 description="Registre a primeira venda para acompanhar o pipeline comercial."
@@ -467,7 +467,7 @@ export function DashboardHome({ stats, userRole }: DashboardHomeProps) {
               />
             </div>
           ) : (
-            <div className={`${tableWrapClass()} mt-6`}>
+            <div className={`${tableWrapClass()} pb-2`}>
               <table className={dataTableClass()}>
                 <thead>
                   <tr>
@@ -492,7 +492,7 @@ export function DashboardHome({ stats, userRole }: DashboardHomeProps) {
                         </div>
                       </td>
                       <td className={tableCellClass()}>
-                        <StatusBadge status={v.status} />
+                        <StatusBadge status={v.statusOperacional} />
                       </td>
                       <td className={`${tableCellClass()} whitespace-nowrap tabular-nums font-medium`}>
                         {formatMoneyPtBrFromCentavos(v.valorCentavos)}

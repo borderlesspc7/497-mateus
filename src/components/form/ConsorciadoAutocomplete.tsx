@@ -116,7 +116,7 @@ export function ConsorciadoAutocomplete({
         <ul
           id={listboxId}
           role="listbox"
-          className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg"
+          className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-zinc-200 bg-white py-1 shadow-xl"
         >
           {filtered.map((item, index) => (
             <li key={item.id} role="option" aria-selected={item.id === value}>

@@ -1,10 +1,17 @@
+import { readNumeroContrato, withNumeroContratoFields } from "@/lib/firestore/contrato-matriz";
 import type { ConsorciadoDoc, VendaDoc } from "@/lib/firestore/types";
-import type { StatusInconsistencia, StatusPosVenda, VendaStatus } from "@/lib/types/domain";
+import type { StatusInconsistencia, StatusOperacionalCota, StatusPosVenda } from "@/lib/types/domain";
 import { DEFAULT_STATUS_POS_VENDA } from "@/lib/vendas/pos-venda";
 
-type LegacyConsorciadoDoc = ConsorciadoDoc & { documento?: string; endereco?: string };
+type LegacyConsorciadoDoc = ConsorciadoDoc & {
+  documento?: string;
+  endereco?: string;
+  /** Campos legados incorretos — removidos na sanitização. */
+  status?: string;
+  statusOperacional?: string;
+};
 
-const LEGACY_STATUS_MAP: Record<string, VendaStatus> = {
+const LEGACY_STATUS_MAP: Record<string, StatusOperacionalCota> = {
   RASCUNHO: "ATIVO",
   ENVIADA: "ATIVO",
   FECHADA: "ATIVO",
@@ -18,12 +25,28 @@ export function readConsorciadoCpfCnpj(raw: LegacyConsorciadoDoc): string {
   return raw.cpf_cnpj?.trim() || raw.documento?.trim() || "";
 }
 
-export function normalizeVendaStatus(status: string | undefined): VendaStatus {
+/** Remove campos operacionais que não pertencem ao perfil do consorciado. */
+export function sanitizeConsorciadoDoc(raw: LegacyConsorciadoDoc): ConsorciadoDoc {
+  return {
+    nome: raw.nome,
+    cpf_cnpj: readConsorciadoCpfCnpj(raw),
+    telefone: raw.telefone,
+    email: raw.email,
+    criadoEm: raw.criadoEm,
+  };
+}
+
+export function normalizeStatusOperacional(status: string | undefined): StatusOperacionalCota {
   if (!status) return "ATIVO";
   return LEGACY_STATUS_MAP[status] ?? "ATIVO";
 }
 
+/** @deprecated Use normalizeStatusOperacional */
+export const normalizeVendaStatus = normalizeStatusOperacional;
+
 type LegacyVendaDoc = VendaDoc & {
+  /** @deprecated Use statusOperacional */
+  status?: string;
   contrato?: string;
   grupo?: string;
   cota?: string;
@@ -60,12 +83,22 @@ export function resolveDataContrato(raw: {
   return raw.dataContrato ?? raw.dataVenda ?? raw.createdAt ?? new Date(0).toISOString();
 }
 
+/** Espelha statusOperacional no campo legado `status` para queries Firestore existentes. */
+export function withStatusOperacionalFields(statusOperacional: StatusOperacionalCota): {
+  statusOperacional: StatusOperacionalCota;
+  status: StatusOperacionalCota;
+} {
+  return { statusOperacional, status: statusOperacional };
+}
+
 export function normalizeVendaFields(raw: LegacyVendaDoc): Pick<
   VendaDoc,
+  | "statusOperacional"
   | "status"
   | "statusInconsistencia"
   | "statusPosVenda"
   | "parcelasPagasCancelamento"
+  | "numeroContrato"
   | "contrato"
   | "grupo"
   | "cota"
@@ -74,12 +107,17 @@ export function normalizeVendaFields(raw: LegacyVendaDoc): Pick<
   | "vendedorId"
   | "dataContrato"
 > {
+  const numeroContrato = readNumeroContrato(raw);
+  const matrizFields = withNumeroContratoFields(numeroContrato);
+
+  const statusOperacional = normalizeStatusOperacional(raw.statusOperacional ?? raw.status);
+
   return {
-    status: normalizeVendaStatus(raw.status),
+    ...withStatusOperacionalFields(statusOperacional),
     statusInconsistencia: normalizeStatusInconsistencia(raw.statusInconsistencia),
     statusPosVenda: normalizeStatusPosVenda(raw.statusPosVenda),
     parcelasPagasCancelamento: normalizeParcelasPagasCancelamento(raw.parcelasPagasCancelamento),
-    contrato: raw.contrato?.trim() || raw.titulo?.trim() || "",
+    ...matrizFields,
     grupo: raw.grupo?.trim() || "",
     cota: raw.cota?.trim() || "",
     dataVencimento:

@@ -132,7 +132,7 @@ export default function ImportacaoClient() {
       .filter((item) => item.willUpdate)
       .map((item) => ({
         vendaId: item.vendaId,
-        status: item.statusNovo,
+        statusOperacional: item.statusNovo,
         parcelasPagasCancelamento: item.parcelasPagasCancelamento,
       }));
 
@@ -152,7 +152,7 @@ export default function ImportacaoClient() {
   return (
     <div className="space-y-6">
       <div className={panelClass()}>
-        <div className="border-b border-zinc-100 px-6 py-5">
+        <div className="border-b border-zinc-100 px-4 py-4 sm:px-6 lg:px-8">
           <h2 className="text-base font-semibold text-zinc-900">Upload da remessa</h2>
           <p className="mt-1 text-sm text-zinc-600">
             Arraste um arquivo .csv ou .xlsx com as colunas{" "}
@@ -162,7 +162,7 @@ export default function ImportacaoClient() {
           </p>
         </div>
 
-        <div className="px-6 py-5">
+        <div className="px-4 py-4 sm:px-6 lg:px-8">
           <div
             role="button"
             tabIndex={0}
@@ -288,7 +288,7 @@ export default function ImportacaoClient() {
             ) : null}
           </div>
 
-          <div className="px-6 py-5">
+          <div className="px-4 py-4 sm:px-6 lg:px-8">
             <div className={tableWrapClass()}>
               <table className={dataTableClass()}>
                 <thead>
@@ -321,7 +321,7 @@ export default function ImportacaoClient() {
                           >
                             <td className={tableCellClass()}>{item.linha}</td>
                             <td className={`${tableCellClass()} font-medium text-zinc-900`}>
-                              {item.contrato}
+                              {item.numeroContrato}
                             </td>
                             <td className={tableCellClass()}>
                               <StatusBadge status={item.statusAtual} />
@@ -346,12 +346,12 @@ export default function ImportacaoClient() {
                         const { item } = row;
                         return (
                           <tr
-                            key={`not-found-${item.contrato}-${item.linha}`}
+                            key={`not-found-${item.numeroContrato}-${item.linha}`}
                             className={[tableRowClass(index), "bg-amber-50/80"].join(" ")}
                           >
                             <td className={tableCellClass()}>{item.linha}</td>
                             <td className={`${tableCellClass()} font-medium text-zinc-900`}>
-                              {item.contrato}
+                              {item.numeroContrato}
                             </td>
                             <td className={tableCellClass()}>—</td>
                             <td className={tableCellClass()}>
@@ -373,7 +373,7 @@ export default function ImportacaoClient() {
                           className={[tableRowClass(index), "bg-red-50/60"].join(" ")}
                         >
                           <td className={tableCellClass()}>{item.linha}</td>
-                          <td className={tableCellClass()}>{item.contrato ?? "—"}</td>
+                          <td className={tableCellClass()}>{item.numeroContrato ?? "—"}</td>
                           <td className={tableCellClass()}>—</td>
                           <td className={tableCellClass()}>—</td>
                           <td className={tableCellClass()}>

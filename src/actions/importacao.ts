@@ -18,7 +18,7 @@ import type {
   ImportRowInput,
 } from "@/lib/importacao/types";
 import { normalizeContrato, parseImportStatus } from "@/lib/importacao/status";
-import type { VendaStatus } from "@/lib/types/domain";
+import type { StatusOperacionalCota } from "@/lib/types/domain";
 
 const MAX_IMPORT_ROWS = 10_000;
 
@@ -31,7 +31,7 @@ function revalidateImportacaoPaths() {
   revalidatePath("/comissoes");
 }
 
-function assertValidStatus(status: string): asserts status is VendaStatus {
+function assertValidStatus(status: string): asserts status is StatusOperacionalCota {
   if (!parseImportStatus(status)) {
     throw new Error(`Status inválido: ${status}`);
   }
@@ -55,45 +55,48 @@ export async function previewImportacaoStatus(
   const invalid: ImportPreviewInvalid[] = [];
 
   for (const row of rows) {
-    const contrato = normalizeContrato(row.contrato);
-    const status = parseImportStatus(row.status);
+    const numeroContrato = normalizeContrato(row.numeroContrato);
+    const statusOperacional = parseImportStatus(row.statusOperacional);
 
-    if (!contrato) {
+    if (!numeroContrato) {
       invalid.push({
         kind: "invalid",
         linha: row.linha,
-        contrato: null,
-        error: "Contrato vazio ou inválido.",
+        numeroContrato: null,
+        error: "Número do contrato vazio ou inválido.",
       });
       continue;
     }
 
-    if (!status) {
+    if (!statusOperacional) {
       invalid.push({
         kind: "invalid",
         linha: row.linha,
-        contrato,
-        error: `Status inválido: ${String(row.status)}`,
+        numeroContrato,
+        error: `Status inválido: ${String(row.statusOperacional)}`,
       });
       continue;
     }
 
-    const venda = lookup.get(contrato);
+    const venda = lookup.get(numeroContrato);
     if (!venda) {
       notFound.push({
         kind: "not_found",
         linha: row.linha,
-        contrato,
-        statusNovo: status,
+        numeroContrato,
+        statusNovo: statusOperacional,
       });
       continue;
     }
 
-    if (status === "CANCELADO" && (row.parcelasPagasCancelamento === undefined || row.parcelasPagasCancelamento === null)) {
+    if (
+      statusOperacional === "CANCELADO" &&
+      (row.parcelasPagasCancelamento === undefined || row.parcelasPagasCancelamento === null)
+    ) {
       invalid.push({
         kind: "invalid",
         linha: row.linha,
-        contrato,
+        numeroContrato,
         error: "Informe PARCELAS_PAGAS para vendas canceladas.",
       });
       continue;
@@ -102,11 +105,11 @@ export async function previewImportacaoStatus(
     matched.push({
       kind: "matched",
       linha: row.linha,
-      contrato,
-      statusAtual: venda.status,
-      statusNovo: status,
+      numeroContrato,
+      statusAtual: venda.statusOperacional,
+      statusNovo: statusOperacional,
       vendaId: venda.id,
-      willUpdate: venda.status !== status,
+      willUpdate: venda.statusOperacional !== statusOperacional,
       parcelasPagasCancelamento: row.parcelasPagasCancelamento,
     });
   }
@@ -144,8 +147,8 @@ export async function confirmImportacaoStatus(
     if (!item.vendaId?.trim()) {
       throw new Error("Identificador de venda inválido na confirmação.");
     }
-    assertValidStatus(item.status);
-    if (item.status === "CANCELADO" && item.parcelasPagasCancelamento === undefined) {
+    assertValidStatus(item.statusOperacional);
+    if (item.statusOperacional === "CANCELADO" && item.parcelasPagasCancelamento === undefined) {
       throw new Error("Cancelamentos importados exigem PARCELAS_PAGAS.");
     }
   }

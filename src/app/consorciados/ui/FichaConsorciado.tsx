@@ -11,6 +11,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import {
   dataTableClass,
   panelClass,
+  panelInsetClass,
   primaryActionClass,
   secondaryActionClass,
   tableCellClass,
@@ -151,8 +152,10 @@ export default function FichaConsorciado({ id }: FichaConsorciadoProps) {
         </div>
       </section>
 
-      <section className={`${panelClass()} mt-5 p-6`}>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <section className={`${panelClass()} mt-5`}>
+        <div
+          className={`flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between ${panelInsetClass()}`}
+        >
           <div>
             <h2 className="text-sm font-medium text-zinc-900">Cotas (vendas)</h2>
             <p className="mt-1 text-sm text-zinc-600">
@@ -167,7 +170,7 @@ export default function FichaConsorciado({ id }: FichaConsorciadoProps) {
         </div>
 
         {vendas.length === 0 ? (
-          <div className="mt-4">
+          <div className={`pb-5 ${panelInsetClass()}`}>
             <EmptyState
               title="Sem cotas cadastradas"
               description="Registre uma venda vinculada a este consorciado."
@@ -179,7 +182,7 @@ export default function FichaConsorciado({ id }: FichaConsorciadoProps) {
             />
           </div>
         ) : (
-          <div className={`${tableWrapClass()} mt-4`}>
+          <div className={tableWrapClass()}>
             <table className={dataTableClass()}>
               <thead>
                 <tr>
@@ -204,13 +207,13 @@ export default function FichaConsorciado({ id }: FichaConsorciadoProps) {
                     }}
                   >
                     <td className={`${tableCellClass()} font-medium text-zinc-900`}>
-                      {venda.contrato}
+                      {venda.numeroContrato}
                     </td>
                     <td className={tableCellClass()}>{venda.grupo}</td>
                     <td className={tableCellClass()}>{venda.cota}</td>
                     <td className={tableCellClass()}>Dia {venda.dataVencimento}</td>
                     <td className={tableCellClass()}>
-                      <StatusBadge status={venda.status} />
+                      <StatusBadge status={venda.statusOperacional} />
                     </td>
                     <td className={tableCellClass()}>{venda.administradora.nome}</td>
                     <td className={`${tableCellClass()} tabular-nums`}>
@@ -224,8 +227,8 @@ export default function FichaConsorciado({ id }: FichaConsorciadoProps) {
                         <WhatsAppButton
                           telefone={consorciado.telefone}
                           nomeCliente={consorciado.nome}
-                          contrato={venda.contrato}
-                          statusVenda={venda.status}
+                          numeroContrato={venda.numeroContrato}
+                          statusOperacional={venda.statusOperacional}
                           vendaId={venda.id}
                         />
                         <button

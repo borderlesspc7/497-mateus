@@ -1,5 +1,6 @@
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { resolvePlanoRegrasFinanceiras } from "@/lib/planos/regras-financeiras";
+import { normalizeVendaFields } from "@/lib/firestore/legacy";
 import { COLLECTIONS, nowIso, type ExtratoDoc, type PlanoDoc, type VendaDoc } from "@/lib/firestore/types";
 import {
   calcularEstorno,
@@ -29,8 +30,9 @@ export async function aplicarEstornoCancelamentoVenda(
     throw new Error("Venda não encontrada.");
   }
 
-  const venda = { id: vendaSnap.id, ...(vendaSnap.data() as VendaDoc) };
-  if (venda.status !== "CANCELADO") {
+  const vendaRaw = { id: vendaSnap.id, ...(vendaSnap.data() as VendaDoc) };
+  const venda = { ...vendaRaw, ...normalizeVendaFields(vendaRaw) };
+  if (venda.statusOperacional !== "CANCELADO") {
     throw new Error("Estorno só pode ser aplicado em vendas canceladas.");
   }
 
@@ -93,9 +95,9 @@ export async function aplicarEstornoCancelamentoVenda(
     if (extrato.tipo === "ESTORNO") continue;
 
     const deveEstornar =
-      !vendaGeraExtratosComissao(venda.status) &&
+      !vendaGeraExtratosComissao(venda.statusOperacional) &&
       extratoDeveSerEstornado(
-        venda.status,
+        venda.statusOperacional,
         dataReferencia,
         regras.diasParaEstorno,
         extrato.status,
@@ -120,6 +122,7 @@ export async function aplicarEstornoCancelamentoVenda(
 
   const doc: ExtratoDoc = {
     vendaId,
+    numeroContrato: venda.numeroContrato,
     planoId: venda.planoId,
     parcelaNumero: 0,
     parcelaTotal: regras.parcelasRecebimento,
@@ -141,3 +144,4 @@ export async function aplicarEstornoCancelamentoVenda(
     motivo: estorno.motivo,
   };
 }
+

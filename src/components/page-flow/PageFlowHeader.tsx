@@ -22,8 +22,8 @@ export function PageFlowHeader({
   actions,
 }: PageFlowHeaderProps) {
   return (
-    <header className="mb-10 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-      <div className="min-w-0 flex-1 space-y-4">
+    <header className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0 flex-1 space-y-3">
         <nav
           className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-zinc-500"
           aria-label="Trilha de navegação"
@@ -49,11 +49,11 @@ export function PageFlowHeader({
           ))}
         </nav>
         <div className="space-y-2.5">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 sm:text-3xl">
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
             {title}
           </h1>
           {description ? (
-            <p className="max-w-2xl text-sm leading-7 text-zinc-600">{description}</p>
+            <p className="max-w-3xl text-sm leading-6 text-zinc-600">{description}</p>
           ) : null}
         </div>
       </div>

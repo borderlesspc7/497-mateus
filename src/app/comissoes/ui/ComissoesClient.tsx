@@ -46,7 +46,7 @@ export default function ComissoesClient({ initialItems }: ComissoesClientProps) 
     return items.filter((row) => {
       if (statusFilter && row.status !== statusFilter) return false;
       if (!q) return true;
-      const hay = `${row.vendaContrato} ${row.vendaTitulo} ${row.consorciadoNome ?? ""} ${row.planoNome} ${row.vendedorNome ?? ""} ${row.parcelaLabel}`.toLowerCase();
+      const hay = `${row.numeroContrato} ${row.vendaTitulo} ${row.consorciadoNome ?? ""} ${row.planoNome} ${row.vendedorNome ?? ""} ${row.parcelaLabel}`.toLowerCase();
       return hay.includes(q);
     });
   }, [items, query, statusFilter]);
@@ -217,7 +217,7 @@ export default function ComissoesClient({ initialItems }: ComissoesClientProps) 
                       href={`/vendas/${row.vendaId}`}
                       className="underline-offset-2 hover:underline"
                     >
-                      {row.vendaContrato}
+                      {row.numeroContrato}
                     </Link>
                   </td>
                   <td className={tableCellClass()}>{row.consorciadoNome ?? "—"}</td>
