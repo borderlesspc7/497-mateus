@@ -9,7 +9,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { ensureFirebaseAuth, getClientFirestore } from "@/lib/firebase/client";
-import { readConsorciadoCpfCnpj, sanitizeConsorciadoDoc } from "@/lib/firestore/legacy";
+import { sanitizeConsorciadoDoc } from "@/lib/firestore/legacy";
 import {
   COLLECTIONS,
   newId,
@@ -21,22 +21,24 @@ import {
 import type { ConsorciadoMini, ConsorciadoRow } from "@/lib/types/domain";
 
 function toConsorciadoRow(doc: DocWithId<ConsorciadoDoc>): ConsorciadoRow {
+  const sanitized = sanitizeConsorciadoDoc(doc);
   return {
     id: doc.id,
-    nome: doc.nome,
-    cpf_cnpj: readConsorciadoCpfCnpj(doc),
-    telefone: doc.telefone,
-    email: doc.email,
-    criadoEm: doc.criadoEm,
+    nome: sanitized.nome,
+    cpf_cnpj: sanitized.cpf_cnpj,
+    telefone: sanitized.telefone,
+    email: sanitized.email,
+    criadoEm: sanitized.criadoEm,
   };
 }
 
 function toConsorciadoMini(doc: DocWithId<ConsorciadoDoc>): ConsorciadoMini {
+  const sanitized = sanitizeConsorciadoDoc(doc);
   return {
     id: doc.id,
-    nome: doc.nome,
-    cpf_cnpj: readConsorciadoCpfCnpj(doc),
-    telefone: doc.telefone,
+    nome: sanitized.nome,
+    cpf_cnpj: sanitized.cpf_cnpj,
+    telefone: sanitized.telefone,
   };
 }
 
@@ -54,7 +56,7 @@ export async function listConsorciados(): Promise<ConsorciadoRow[]> {
   const snap = await getDocs(collection(db, COLLECTIONS.consorciados));
   const rows = snap.docs.map((item) => ({
     id: item.id,
-    ...(item.data() as ConsorciadoDoc),
+    ...sanitizeConsorciadoDoc(item.data() as ConsorciadoDoc),
   }));
   return sortByCriadoEmDesc(rows).map(toConsorciadoRow);
 }
@@ -64,7 +66,7 @@ export async function listConsorciadosMiniClient(): Promise<ConsorciadoMini[]> {
   const snap = await getDocs(collection(db, COLLECTIONS.consorciados));
   const rows = snap.docs.map((item) => ({
     id: item.id,
-    ...(item.data() as ConsorciadoDoc),
+    ...sanitizeConsorciadoDoc(item.data() as ConsorciadoDoc),
   }));
   return sortByCriadoEmDesc(rows).map(toConsorciadoMini);
 }
@@ -73,7 +75,8 @@ export async function getConsorciado(id: string): Promise<ConsorciadoRow | null>
   const db = await getDb();
   const snap = await getDoc(doc(db, COLLECTIONS.consorciados, id));
   if (!snap.exists()) return null;
-  return toConsorciadoRow({ id: snap.id, ...(snap.data() as ConsorciadoDoc) });
+  const sanitized = sanitizeConsorciadoDoc(snap.data() as ConsorciadoDoc);
+  return toConsorciadoRow({ id: snap.id, ...sanitized });
 }
 
 export type ConsorciadoInput = {

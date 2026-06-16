@@ -3,57 +3,34 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { listConsorciados } from "@/lib/firestore/consorciados-client";
-import { listVendasSearchIndex } from "@/lib/firestore/vendas-search-client";
-import {
-  EMPTY_CONSORCIADO_SEARCH_FILTERS,
-  filterConsorciados,
-  hasActiveConsorciadoSearchFilters,
-  type ConsorciadoSearchFilters,
-} from "@/lib/consorciados/filter-consorciados";
+import { ConsorciadoAdvancedSearch } from "@/components/consorciados/ConsorciadoAdvancedSearch";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { DataListPanel } from "@/components/ui/DataListPanel";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PaginatedListFooter } from "@/components/ui/PaginatedListFooter";
+import { SummaryChip } from "@/components/ui/SummaryChip";
 import { TableSkeleton } from "@/components/ui/Skeleton";
 import {
   dataTableClass,
-  formControlClass,
   panelClass,
-  primaryActionClass,
   secondaryActionClass,
   tableCellClass,
   tableHeadCellClass,
   tableRowClass,
   tableWrapClass,
 } from "@/components/ui/list-panel-classes";
+import { buildConsorciadoVendaStatsMap } from "@/lib/consorciados/consorciado-venda-stats";
+import {
+  EMPTY_CONSORCIADO_SEARCH_FILTERS,
+  filterConsorciados,
+  hasActiveConsorciadoSearchFilters,
+  type ConsorciadoSearchFilters,
+} from "@/lib/consorciados/filter-consorciados";
+import { listConsorciados } from "@/lib/firestore/consorciados-client";
+import { listVendasSearchIndex } from "@/lib/firestore/vendas-search-client";
 import type { ConsorciadoRow } from "@/lib/types/domain";
 
 const CONSORCIADOS_PAGE_SIZE = 25;
-
-function SearchField({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-}) {
-  return (
-    <label className="block min-w-0 flex-1 basis-48">
-      <span className="mb-1.5 block text-xs font-medium text-zinc-600">{label}</span>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className={formControlClass()}
-      />
-    </label>
-  );
-}
 
 export default function ConsorciadosClient() {
   const router = useRouter();
@@ -87,6 +64,11 @@ export default function ConsorciadosClient() {
     };
   }, []);
 
+  const vendaStatsMap = useMemo(
+    () => buildConsorciadoVendaStatsMap(vendasIndex),
+    [vendasIndex],
+  );
+
   const filtered = useMemo(
     () => filterConsorciados(items, vendasIndex, filters),
     [items, vendasIndex, filters],
@@ -104,158 +86,141 @@ export default function ConsorciadosClient() {
   const hasMore = visibleCount < filtered.length;
   const hasFilters = hasActiveConsorciadoSearchFilters(filters);
 
-  function updateFilter<K extends keyof ConsorciadoSearchFilters>(key: K, value: string) {
-    setFilters((current) => ({ ...current, [key]: value }));
-  }
-
   function loadMore() {
     setVisibleCount((current) =>
       Math.min(current + CONSORCIADOS_PAGE_SIZE, filtered.length),
     );
   }
 
+  function openFicha(consorciadoId: string) {
+    router.push(`/consorciados/${consorciadoId}`);
+  }
+
   if (loading) {
     return (
       <div className={`${panelClass()} p-6`}>
-        <TableSkeleton rows={6} columns={5} />
+        <TableSkeleton rows={6} columns={6} />
       </div>
     );
   }
 
   return (
-    <DataListPanel
-      title="Consulta de consorciados"
-      toolbar={
-        <div className="w-full space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <SearchField
-              label="Nome"
-              value={filters.nome}
-              onChange={(value) => updateFilter("nome", value)}
-              placeholder="Nome do consorciado"
-            />
-            <SearchField
-              label="CPF / CNPJ"
-              value={filters.cpf}
-              onChange={(value) => updateFilter("cpf", value)}
-              placeholder="000.000.000-00"
-            />
-            <SearchField
-              label="Número do contrato"
-              value={filters.contrato}
-              onChange={(value) => updateFilter("contrato", value)}
-              placeholder="Ex.: 123456"
-            />
-            <SearchField
-              label="Grupo"
-              value={filters.grupo}
-              onChange={(value) => updateFilter("grupo", value)}
-              placeholder="Ex.: A100"
-            />
-            <SearchField
-              label="Cota"
-              value={filters.cota}
-              onChange={(value) => updateFilter("cota", value)}
-              placeholder="Ex.: 025"
-            />
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="text-xs text-zinc-500">
-              {hasFilters
-                ? `${filtered.length} resultado(s) encontrado(s)`
-                : filtered.length > CONSORCIADOS_PAGE_SIZE
-                  ? `Exibindo ${visibleItems.length} de ${filtered.length} consorciado(s)`
-                  : `${filtered.length} consorciado(s) cadastrado(s)`}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {hasFilters ? (
-                <button
-                  type="button"
-                  onClick={() => setFilters(EMPTY_CONSORCIADO_SEARCH_FILTERS)}
-                  className={secondaryActionClass()}
-                >
-                  Limpar filtros
-                </button>
-              ) : null}
-              <Link href="/consorciados/nova" className={primaryActionClass()}>
-                Novo consorciado
-              </Link>
-            </div>
-          </div>
-        </div>
-      }
-      error={
-        error ? (
-          <AlertBanner tone="error">{error}</AlertBanner>
-        ) : null
-      }
-    >
-      {filtered.length === 0 ? (
-        <EmptyState
-          title={items.length === 0 ? "Nenhum consorciado cadastrado" : "Nenhum resultado encontrado"}
-          description={
-            items.length === 0
-              ? "Quando houver cadastros, eles aparecerão aqui para consulta."
-              : "Ajuste os filtros e tente novamente."
-          }
-          action={
-            items.length === 0 ? (
-              <Link href="/consorciados/nova" className={primaryActionClass()}>
-                Cadastrar consorciado
-              </Link>
-            ) : undefined
-          }
-        />
-      ) : (
-        <>
-          <div className={tableWrapClass()}>
-            <table className={dataTableClass()}>
-              <thead>
-                <tr>
-                  <th className={tableHeadCellClass()}>Nome</th>
-                  <th className={tableHeadCellClass()}>CPF / CNPJ</th>
-                  <th className={tableHeadCellClass()}>Telefone</th>
-                  <th className={tableHeadCellClass()}>E-mail</th>
-                  <th className={tableHeadCellClass()}>Cadastrado em</th>
-                  <th className={`${tableHeadCellClass()} pr-0 text-right`}>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleItems.map((item, index) => (
-                  <tr
-                    key={item.id}
-                    className={`${tableRowClass(index)} cursor-pointer hover:bg-zinc-50/80`}
-                    onClick={() => router.push(`/consorciados/${item.id}`)}
-                  >
-                    <td className={`${tableCellClass()} font-medium text-zinc-900`}>{item.nome}</td>
-                    <td className={tableCellClass()}>{item.cpf_cnpj}</td>
-                    <td className={tableCellClass()}>{item.telefone}</td>
-                    <td className={tableCellClass()}>{item.email}</td>
-                    <td className={`${tableCellClass()} whitespace-nowrap`}>
-                      {new Date(item.criadoEm).toLocaleDateString("pt-BR")}
-                    </td>
-                    <td
-                      className={`${tableCellClass()} pr-0 text-right`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Link href={`/consorciados/${item.id}`} className={secondaryActionClass()}>
-                        Abrir ficha
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <PaginatedListFooter
-            hasMore={hasMore}
-            isLoadingMore={false}
-            onLoadMore={loadMore}
-            columns={6}
-            skeletonRows={4}
+    <div className="space-y-5">
+      <ConsorciadoAdvancedSearch
+        filters={filters}
+        onChange={setFilters}
+        resultCount={filtered.length}
+        totalCount={items.length}
+      />
+
+      <DataListPanel
+        title="Resultados da consulta"
+        description={
+          hasFilters
+            ? "Clique em uma linha ou em «Abrir ficha» para ver produtos contratados e históricos."
+            : "Listagem completa. Use a busca avançada acima para refinar por contrato, grupo ou cota."
+        }
+        error={error ? <AlertBanner tone="error">{error}</AlertBanner> : null}
+      >
+        {filtered.length === 0 ? (
+          <EmptyState
+            title={items.length === 0 ? "Nenhum consorciado na base" : "Nenhum resultado encontrado"}
+            description={
+              items.length === 0
+                ? "Consorciados são vinculados automaticamente ao registrar vendas. Quando houver cadastros, eles aparecerão aqui."
+                : "Ajuste os filtros de nome, CPF, contrato, grupo ou cota e tente novamente."
+            }
           />
-        </>
-      )}
-    </DataListPanel>
+        ) : (
+          <>
+            <div className={tableWrapClass()}>
+              <table className={dataTableClass()}>
+                <thead>
+                  <tr>
+                    <th className={tableHeadCellClass()}>Nome</th>
+                    <th className={tableHeadCellClass()}>CPF / CNPJ</th>
+                    <th className={tableHeadCellClass()}>Telefone</th>
+                    <th className={tableHeadCellClass()}>Cotas</th>
+                    <th className={tableHeadCellClass()}>Situação</th>
+                    <th className={`${tableHeadCellClass()} pr-0 text-right`}>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleItems.map((item, index) => {
+                    const stats = vendaStatsMap.get(item.id);
+                    return (
+                      <tr
+                        key={item.id}
+                        className={`${tableRowClass(index)} cursor-pointer hover:bg-zinc-50/80`}
+                        onClick={() => openFicha(item.id)}
+                      >
+                        <td className={`${tableCellClass()} font-medium text-zinc-900`}>
+                          {item.nome}
+                        </td>
+                        <td className={tableCellClass()}>{item.cpf_cnpj}</td>
+                        <td className={tableCellClass()}>{item.telefone}</td>
+                        <td className={tableCellClass()}>
+                          <span className="tabular-nums text-sm text-zinc-800">
+                            {stats?.totalCotas ?? 0}
+                          </span>
+                        </td>
+                        <td className={tableCellClass()}>
+                          <div className="flex flex-wrap gap-1.5">
+                            {(stats?.inadimplentes ?? 0) > 0 ? (
+                              <SummaryChip
+                                label="Inadimpl."
+                                value={stats!.inadimplentes}
+                                tone="red"
+                              />
+                            ) : null}
+                            {(stats?.inconsistentes ?? 0) > 0 ? (
+                              <SummaryChip
+                                label="Inconsist."
+                                value={stats!.inconsistentes}
+                                tone="yellow"
+                              />
+                            ) : null}
+                            {!stats || (stats.inadimplentes === 0 && stats.inconsistentes === 0) ? (
+                              <span className="text-xs text-zinc-400">—</span>
+                            ) : null}
+                          </div>
+                        </td>
+                        <td
+                          className={`${tableCellClass()} pr-0 text-right`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => openFicha(item.id)}
+                            className={secondaryActionClass()}
+                          >
+                            Abrir ficha
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <PaginatedListFooter
+              hasMore={hasMore}
+              isLoadingMore={false}
+              onLoadMore={loadMore}
+              columns={6}
+              skeletonRows={4}
+            />
+          </>
+        )}
+      </DataListPanel>
+
+      <p className="text-center text-xs text-zinc-400">
+        Novos consorciados podem ser cadastrados durante o fluxo de{" "}
+        <Link href="/vendas/nova" className="font-medium text-zinc-600 underline-offset-2 hover:underline">
+          Nova venda
+        </Link>
+        .
+      </p>
+    </div>
   );
 }

@@ -1,8 +1,12 @@
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import type { VendaContratoLookup } from "@/lib/firestore/contrato-matriz";
-import { normalizeNumeroContrato } from "@/lib/firestore/contrato-matriz";
+import {
+  buildContratoLookupFromVendas,
+  normalizeNumeroContrato,
+} from "@/lib/firestore/contrato-matriz";
 import { aplicarEstornoCancelamentoVenda } from "@/lib/firestore/estorno-cancelamento";
 import { normalizeVendaFields } from "@/lib/firestore/legacy";
+import { listVendaDocsByStatusOperacional } from "@/lib/firestore/repository";
 import { COLLECTIONS, nowIso, type ConsorciadoDoc, type VendaDoc } from "@/lib/firestore/types";
 import type {
   ImportConfirmItem,
@@ -14,21 +18,21 @@ export type { VendaContratoLookup };
 
 export async function buildVendaContratoLookupMap(): Promise<Map<string, VendaContratoLookup>> {
   const snap = await getAdminFirestore().collection(COLLECTIONS.vendas).get();
-  const map = new Map<string, VendaContratoLookup>();
+  const entries: VendaContratoLookup[] = [];
 
   for (const doc of snap.docs) {
     const data = doc.data() as VendaDoc;
     const normalized = normalizeVendaFields(data);
     const numeroContrato = normalized.numeroContrato;
     if (!numeroContrato) continue;
-    map.set(numeroContrato, {
+    entries.push({
       id: doc.id,
       numeroContrato,
       statusOperacional: normalized.statusOperacional,
     });
   }
 
-  return map;
+  return buildContratoLookupFromVendas(entries);
 }
 
 export async function listInadimplentesMissingFromSpreadsheet(
@@ -42,7 +46,7 @@ export async function listInadimplentesMissingFromSpreadsheet(
   );
 
   const db = getAdminFirestore();
-  const snap = await db.collection(COLLECTIONS.vendas).where("status", "==", "INADIMPLENTE").get();
+  const vendas = await listVendaDocsByStatusOperacional("INADIMPLENTE");
 
   const inadimplentes: Array<{
     vendaId: string;
@@ -52,16 +56,19 @@ export async function listInadimplentesMissingFromSpreadsheet(
     consorciadoId: string | null;
   }> = [];
 
-  for (const doc of snap.docs) {
-    const data = doc.data() as VendaDoc;
+  let totalInadimplentesNoSistema = 0;
+
+  for (const data of vendas) {
     const normalized = normalizeVendaFields(data);
     if (normalized.statusOperacional !== "INADIMPLENTE") continue;
+
+    totalInadimplentesNoSistema += 1;
 
     const numeroContrato = normalized.numeroContrato;
     if (!numeroContrato || spreadsheetSet.has(numeroContrato)) continue;
 
     inadimplentes.push({
-      vendaId: doc.id,
+      vendaId: data.id,
       numeroContrato,
       grupo: normalized.grupo,
       cota: normalized.cota,
@@ -97,7 +104,7 @@ export async function listInadimplentesMissingFromSpreadsheet(
 
   return {
     missingFromSpreadsheet,
-    totalInadimplentesNoSistema: snap.size,
+    totalInadimplentesNoSistema: inadimplentes.length,
   };
 }
 

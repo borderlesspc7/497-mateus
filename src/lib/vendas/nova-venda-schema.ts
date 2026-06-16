@@ -10,8 +10,11 @@ export const novoConsorciadoSchema = z.object({
   email: z.string().trim().email("Informe um e-mail válido."),
 });
 
-export const novaVendaOperacionalSchema = z.object({
+export const novaVendaContratoSchema = z.object({
   numeroContrato: z.string().trim().min(1, "Informe o número do contrato."),
+});
+
+export const novaVendaCotaIdentificacaoSchema = z.object({
   grupo: z.string().trim().min(1, "Informe o grupo."),
   cota: z.string().trim().min(1, "Informe a cota."),
   dataVencimento: z
@@ -19,21 +22,26 @@ export const novaVendaOperacionalSchema = z.object({
     .int("Informe o dia de vencimento entre 1 e 31.")
     .min(1, "Informe o dia de vencimento entre 1 e 31.")
     .max(31, "Informe o dia de vencimento entre 1 e 31."),
-  valorCentavos: z
-    .number()
-    .int("Informe o valor do crédito.")
-    .positive("O valor do crédito deve ser maior que zero."),
-  dataFechamento: z.string().trim().min(1, "Informe a data de fechamento."),
-  mesAnoFechamento: z
-    .string()
-    .trim()
-    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Informe o mês/ano de fechamento."),
-  administradoraId: z.string().trim().min(1, "Selecione a administradora."),
-  planoId: z.string().trim().min(1, "Selecione o plano."),
-  equipeId: z.string().trim().min(1, "Selecione a equipe."),
-  vendedorId: z.string().trim().min(1, "Selecione o vendedor."),
-  statusOperacional: statusOperacionalSchema,
 });
+
+export const novaVendaOperacionalSchema = novaVendaContratoSchema
+  .merge(novaVendaCotaIdentificacaoSchema)
+  .extend({
+    valorCentavos: z
+      .number()
+      .int("Informe o valor do crédito.")
+      .positive("O valor do crédito deve ser maior que zero."),
+    dataFechamento: z.string().trim().min(1, "Informe a data de fechamento."),
+    mesAnoFechamento: z
+      .string()
+      .trim()
+      .regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Informe o mês/ano de fechamento."),
+    administradoraId: z.string().trim().min(1, "Selecione a administradora."),
+    planoId: z.string().trim().min(1, "Selecione o plano."),
+    equipeId: z.string().trim().min(1, "Selecione a equipe."),
+    vendedorId: z.string().trim().min(1, "Selecione o vendedor."),
+    statusOperacional: statusOperacionalSchema,
+  });
 
 export type NovaVendaOperacionalInput = z.infer<typeof novaVendaOperacionalSchema>;
 export type NovoConsorciadoInput = z.infer<typeof novoConsorciadoSchema>;

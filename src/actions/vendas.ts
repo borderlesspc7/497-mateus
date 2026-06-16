@@ -18,6 +18,10 @@ import {
   updateVenda as updateVendaDoc,
 } from "@/lib/firestore/repository";
 import { aplicarEstornoCancelamentoVenda } from "@/lib/firestore/estorno-cancelamento";
+import {
+  assertCotaIdentificacaoFields,
+  assertNumeroContratoInformado,
+} from "@/lib/firestore/contrato-matriz";
 import type { StatusInconsistencia, StatusOperacionalCota, StatusPosVenda, VendaRow } from "@/lib/types/domain";
 import type { VendasListFilters, VendasListPage } from "@/lib/firestore/repository";
 
@@ -59,18 +63,14 @@ function assertNovaVendaRequiredFields(data: {
   }
 }
 
-function assertVendaMatrizFields(data: {
+function assertVendaContratoFields(data: {
   numeroContrato: string;
   grupo: string;
   cota: string;
   dataVencimento: number;
 }): void {
-  if (!data.numeroContrato.trim()) throw new Error("Informe o número do contrato.");
-  if (!data.grupo.trim()) throw new Error("Informe o grupo.");
-  if (!data.cota.trim()) throw new Error("Informe a cota.");
-  if (!Number.isInteger(data.dataVencimento) || data.dataVencimento < 1 || data.dataVencimento > 31) {
-    throw new Error("Informe o dia de vencimento entre 1 e 31.");
-  }
+  assertNumeroContratoInformado(data.numeroContrato);
+  assertCotaIdentificacaoFields(data);
 }
 
 function revalidateVendas() {
@@ -143,7 +143,7 @@ export async function createVenda(data: VendaInput): Promise<VendaRow> {
   const titulo = data.titulo.trim();
   if (!titulo) throw new Error("Informe o título da venda.");
   if (!data.consorciadoId.trim()) throw new Error("Selecione um consorciado.");
-  assertVendaMatrizFields(data);
+  assertVendaContratoFields(data);
   assertNovaVendaRequiredFields(data);
 
   await assertAdministradoraExists(data.administradoraId);
@@ -158,7 +158,7 @@ export async function createVenda(data: VendaInput): Promise<VendaRow> {
     equipeId: data.equipeId,
     vendedorId: data.vendedorId,
     statusOperacional: data.statusOperacional,
-    numeroContrato: data.numeroContrato.trim(),
+    numeroContrato: assertNumeroContratoInformado(data.numeroContrato),
     grupo: data.grupo.trim(),
     cota: data.cota.trim(),
     dataVencimento: data.dataVencimento,
@@ -245,7 +245,7 @@ export async function updateVenda(id: string, patch: Partial<VendaInput>): Promi
     patch.cota !== undefined ||
     patch.dataVencimento !== undefined
   ) {
-    assertVendaMatrizFields({
+    assertVendaContratoFields({
       numeroContrato: patch.numeroContrato ?? current.numeroContrato,
       grupo: patch.grupo ?? current.grupo,
       cota: patch.cota ?? current.cota,

@@ -8,10 +8,12 @@ import {
 } from "@/lib/dashboard/ranking";
 import { buildDashboardStats } from "@/lib/dashboard/stats";
 import { DEFAULT_CHECKLIST_ATIVACAO, DEFAULT_STATUS_POS_VENDA } from "@/lib/vendas/pos-venda";
-import { withNumeroContratoFields } from "@/lib/firestore/contrato-matriz";
+import { withNumeroContratoFields, normalizeNumeroContrato } from "@/lib/firestore/contrato-matriz";
 import {
   normalizeVendaFields,
   resolveDataContrato,
+  STATUS_OPERACIONAL_FIELD,
+  STATUS_OPERACIONAL_LEGACY_FIELD,
   withStatusOperacionalFields,
 } from "@/lib/firestore/legacy";
 import { resolvePlanoRegrasFinanceiras } from "@/lib/planos/regras-financeiras";
@@ -591,13 +593,48 @@ function buildVendasPaginatedQuery(filters: VendasListFilters) {
     q = q.where("administradoraId", "==", filters.administradoraId);
   }
   if (filters.statusOperacional) {
-    q = q.where("status", "==", filters.statusOperacional);
+    q = q.where(STATUS_OPERACIONAL_FIELD, "==", filters.statusOperacional);
   }
   if (filters.statusInconsistencia) {
     q = q.where("statusInconsistencia", "==", filters.statusInconsistencia);
   }
 
   return q.orderBy("dataContrato", "desc").limit(VENDAS_PAGE_SIZE);
+}
+
+async function findVendaDocIdByNumeroContrato(
+  numeroContrato: string,
+  excludeId?: string,
+): Promise<string | null> {
+  const normalized = normalizeNumeroContrato(numeroContrato);
+  if (!normalized) return null;
+
+  for (const field of ["numeroContrato", "contrato"] as const) {
+    const snap = await db()
+      .collection(COLLECTIONS.vendas)
+      .where(field, "==", normalized)
+      .limit(2)
+      .get();
+
+    for (const doc of snap.docs) {
+      if (excludeId && doc.id === excludeId) continue;
+      return doc.id;
+    }
+  }
+
+  return null;
+}
+
+async function assertNumeroContratoDisponivel(
+  numeroContrato: string,
+  excludeId?: string,
+): Promise<void> {
+  const existingId = await findVendaDocIdByNumeroContrato(numeroContrato, excludeId);
+  if (existingId) {
+    throw new Error(
+      `Já existe uma venda com o contrato ${normalizeNumeroContrato(numeroContrato)}.`,
+    );
+  }
 }
 
 export async function listVendasPaginated(
@@ -679,26 +716,9 @@ export async function listVendasPosVendaControle(): Promise<VendaRow[]> {
 }
 
 export async function getVendaByNumeroContrato(numeroContrato: string): Promise<VendaRow | null> {
-  const normalized = numeroContrato.trim();
-  if (!normalized) return null;
-
-  let snap = await db()
-    .collection(COLLECTIONS.vendas)
-    .where("numeroContrato", "==", normalized)
-    .limit(1)
-    .get();
-
-  if (snap.empty) {
-    snap = await db()
-      .collection(COLLECTIONS.vendas)
-      .where("contrato", "==", normalized)
-      .limit(1)
-      .get();
-  }
-
-  const doc = snap.docs[0];
-  if (!doc) return null;
-  return getVenda(doc.id);
+  const vendaId = await findVendaDocIdByNumeroContrato(numeroContrato);
+  if (!vendaId) return null;
+  return getVenda(vendaId);
 }
 
 export async function getVenda(id: string): Promise<VendaRow | null> {
@@ -757,6 +777,7 @@ export async function createVenda(
   if (vendedor.equipeId !== data.equipeId) {
     throw new Error("O vendedor não pertence à equipe selecionada.");
   }
+  await assertNumeroContratoDisponivel(data.numeroContrato);
   const ts = nowIso();
   const id = newId();
   const dataContrato = resolveDataContrato({ dataVenda: data.dataVenda, createdAt: ts });
@@ -822,6 +843,9 @@ export async function updateVenda(
   ) as Partial<VendaDoc>;
   const nextNumeroContrato = patch.numeroContrato ?? current.numeroContrato;
   const nextStatusOperacional = patch.statusOperacional ?? current.statusOperacional;
+  if (patch.numeroContrato !== undefined) {
+    await assertNumeroContratoDisponivel(nextNumeroContrato, id);
+  }
   const next: VendaDoc = {
     ...currentData,
     ...patchEntries,
@@ -874,18 +898,40 @@ export async function getDashboardStats(): Promise<import("@/lib/types/domain").
   );
 }
 
+export async function listVendaDocsByStatusOperacional(
+  statusOperacional: StatusOperacionalCota,
+): Promise<DocWithId<VendaDoc>[]> {
+  const [canonicalSnap, legacySnap] = await Promise.all([
+    db()
+      .collection(COLLECTIONS.vendas)
+      .where(STATUS_OPERACIONAL_FIELD, "==", statusOperacional)
+      .get(),
+    db()
+      .collection(COLLECTIONS.vendas)
+      .where(STATUS_OPERACIONAL_LEGACY_FIELD, "==", statusOperacional)
+      .get(),
+  ]);
+
+  const merged = new Map<string, DocWithId<VendaDoc>>();
+  for (const doc of [...canonicalSnap.docs, ...legacySnap.docs]) {
+    if (!merged.has(doc.id)) {
+      merged.set(doc.id, { id: doc.id, ...(doc.data() as VendaDoc) });
+    }
+  }
+  return [...merged.values()];
+}
+
 /**
  * Vendas ATIVO do mês corrente.
- * Usa filtro simples por status (índice automático) e restringe o mês em memória,
- * evitando índices compostos obrigatórios no Firestore.
+ * Consulta statusOperacional (canônico) e status (legado), restringe o mês em memória.
  */
 async function listVendasAtivasNoMesAtual(): Promise<DocWithId<VendaDoc>[]> {
   const { start, end } = getCurrentMonthBounds();
-  const snap = await db().collection(COLLECTIONS.vendas).where("status", "==", "ATIVO").get();
+  const vendas = await listVendaDocsByStatusOperacional("ATIVO");
 
-  return snap.docs
-    .map((doc) => ({ id: doc.id, ...(doc.data() as VendaDoc) }))
-    .filter((venda) => isIsoInRange(vendaRankingReferenceDate(venda), start, end));
+  return vendas.filter((venda) =>
+    isIsoInRange(vendaRankingReferenceDate(venda), start, end),
+  );
 }
 
 export async function getDashboardRanking(): Promise<

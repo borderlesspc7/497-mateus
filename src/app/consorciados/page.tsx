@@ -9,8 +9,8 @@ export default function ConsorciadosPage() {
           { label: "Dashboard", href: "/" },
           { label: "Consorciados" },
         ]}
-        title="Consorciados"
-        description="Central de consulta de consorciados — pesquise por nome, documento, contrato, grupo ou cota e acesse a ficha completa."
+        title="Central de consulta"
+        description="Pesquise consorciados por nome, CPF, número do contrato, grupo ou cota e acesse a ficha completa com históricos."
       />
 
       <ConsorciadosClient />

@@ -82,8 +82,8 @@ export type ExtratoTipo = "COMISSAO" | "ESTORNO";
 
 export type ExtratoDoc = {
   vendaId: string;
-  /** Chave matriz desnormalizada para cruzamento direto por contrato. */
-  numeroContrato?: string;
+  /** Chave matriz desnormalizada — cruzamento universal por número do contrato. */
+  numeroContrato: string;
   planoId: string;
   parcelaNumero: number;
   parcelaTotal: number;
@@ -148,10 +148,11 @@ export type VendaDoc = {
   statusInconsistencia: StatusInconsistencia;
   statusPosVenda: StatusPosVenda;
   parcelasPagasCancelamento: number | null;
-  /** Chave matriz universal do sistema. */
+  /** Chave matriz universal — identificador único do produto/cota. */
   numeroContrato: string;
   /** @deprecated Espelho de numeroContrato para documentos legados. */
   contrato?: string;
+  /** Atributos descritivos da cota (não compõem a chave matriz). */
   grupo: string;
   cota: string;
   dataVencimento: number;

@@ -4,7 +4,7 @@
       "collectionGroup": "vendas",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "statusOperacional", "order": "ASCENDING" },
         { "fieldPath": "dataContrato", "order": "DESCENDING" }
       ]
     },
@@ -21,6 +21,39 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "administradoraId", "order": "ASCENDING" },
+        { "fieldPath": "dataContrato", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "vendas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "administradoraId", "order": "ASCENDING" },
+        { "fieldPath": "statusOperacional", "order": "ASCENDING" },
+        { "fieldPath": "dataContrato", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "vendas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "statusOperacional", "order": "ASCENDING" },
+        { "fieldPath": "dataVenda", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "vendas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "statusOperacional", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "vendas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "dataContrato", "order": "DESCENDING" }
       ]
     },

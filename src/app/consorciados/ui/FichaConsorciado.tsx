@@ -2,30 +2,18 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { ConsorciadoFichaResumo } from "@/components/consorciados/ConsorciadoFichaResumo";
 import { ConsorciadoHistoricoTabs } from "@/components/consorciados/ConsorciadoHistoricoTabs";
+import { ConsorciadoProdutosTable } from "@/components/consorciados/ConsorciadoProdutosTable";
 import { VendaAtendimentoDrawer } from "@/components/vendas/VendaAtendimentoDrawer";
 import { getConsorciado, listVendasByConsorciado } from "@/actions/consorciados";
 import { backLinkClass } from "@/components/page-flow/button-classes";
 import { PageFlowHeader } from "@/components/page-flow/PageFlowHeader";
 import { AlertBanner } from "@/components/ui/AlertBanner";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { PanelSectionHeader } from "@/components/ui/PanelSectionHeader";
 import { DetailPageSkeleton } from "@/components/ui/Skeleton";
-import { InconsistenciaBadge } from "@/components/ui/InconsistenciaBadge";
-import { StatusBadge } from "@/components/ui/StatusBadge";
-import {
-  dataTableClass,
-  panelClass,
-  panelInsetClass,
-  secondaryActionClass,
-  tableCellClass,
-  tableHeadCellClass,
-  tableRowClass,
-  tableWrapClass,
-} from "@/components/ui/list-panel-classes";
+import { panelClass, panelInsetClass, secondaryActionClass } from "@/components/ui/list-panel-classes";
 import type { ConsorciadoRow, VendaRow } from "@/lib/types/domain";
 import { WhatsAppButton } from "@/components/whatsapp/WhatsAppButton";
-import { formatMoneyPtBrFromCentavos } from "@/lib/validators/currency";
 
 type FichaConsorciadoProps = {
   id: string;
@@ -76,8 +64,13 @@ export default function FichaConsorciado({ id }: FichaConsorciadoProps) {
     };
   }, [id]);
 
+  function openAtendimento(venda: VendaRow) {
+    setSelectedVenda(venda);
+    setDrawerOpen(true);
+  }
+
   if (loading) {
-    return <DetailPageSkeleton sections={3} />;
+    return <DetailPageSkeleton sections={4} />;
   }
 
   if (notFound || !consorciado) {
@@ -107,8 +100,8 @@ export default function FichaConsorciado({ id }: FichaConsorciadoProps) {
           { label: "Consorciados", href: "/consorciados" },
           { label: consorciado.nome },
         ]}
-        title={consorciado.nome}
-        description="Ficha completa com produtos contratados e históricos operacionais consolidados."
+        title="Ficha completa"
+        description={`${consorciado.nome} — produtos contratados e históricos operacionais consolidados.`}
         actions={
           <div className="flex flex-wrap gap-2">
             <Link href="/consorciados" className={backLinkClass()}>
@@ -116,9 +109,6 @@ export default function FichaConsorciado({ id }: FichaConsorciadoProps) {
             </Link>
             <Link href={`/consorciados/${id}/editar`} className={secondaryActionClass()}>
               Editar dados
-            </Link>
-            <Link href="/vendas/nova" className={secondaryActionClass()}>
-              Nova venda
             </Link>
           </div>
         }
@@ -130,124 +120,37 @@ export default function FichaConsorciado({ id }: FichaConsorciadoProps) {
         </AlertBanner>
       ) : null}
 
-      <section className={panelClass()}>
-        <div className={`py-5 ${panelInsetClass()}`}>
-          <h2 className="text-base font-semibold text-zinc-900">Dados pessoais</h2>
-        </div>
-        <div className={`pb-5 ${panelInsetClass()}`}>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <DetailItem label="Nome" value={consorciado.nome} />
-          <DetailItem label="CPF / CNPJ" value={consorciado.cpf_cnpj} />
-          <div>
-            <div className="text-xs font-medium text-zinc-500">Telefone</div>
-            <div className="mt-1 flex items-center gap-2">
-              <span className="text-sm font-medium text-zinc-900">
-                {consorciado.telefone || "—"}
-              </span>
-              <WhatsAppButton telefone={consorciado.telefone} nomeCliente={consorciado.nome} />
-            </div>
-          </div>
-          <DetailItem label="E-mail" value={consorciado.email} />
-          <DetailItem
-            label="Cadastrado em"
-            value={new Date(consorciado.criadoEm).toLocaleDateString("pt-BR")}
-          />
-          </div>
-        </div>
-      </section>
+      <ConsorciadoFichaResumo consorciado={consorciado} vendas={vendas} />
 
       <section className={`${panelClass()} mt-5`}>
-        <PanelSectionHeader
-          title="Produtos e cotas contratadas"
-          description={
-            vendas.length === 0
-              ? "Nenhum produto ou cota vinculado a este consorciado."
-              : `${vendas.length} produto(s)/cota(s) vinculado(s). Clique em uma linha para abrir o atendimento da cota.`
-          }
-        />
-
-        {vendas.length === 0 ? (
-          <div className={`pb-5 ${panelInsetClass()}`}>
-            <EmptyState
-              title="Sem produtos contratados"
-              description="Quando houver vendas vinculadas, elas aparecerão aqui com status e histórico."
+        <div className={`py-5 ${panelInsetClass()}`}>
+          <h2 className="text-base font-semibold text-zinc-900">Dados pessoais</h2>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <DetailItem label="Nome" value={consorciado.nome} />
+            <DetailItem label="CPF / CNPJ" value={consorciado.cpf_cnpj} />
+            <div>
+              <div className="text-xs font-medium text-zinc-500">Telefone</div>
+              <div className="mt-1 flex items-center gap-2">
+                <span className="text-sm font-medium text-zinc-900">
+                  {consorciado.telefone || "—"}
+                </span>
+                <WhatsAppButton telefone={consorciado.telefone} nomeCliente={consorciado.nome} />
+              </div>
+            </div>
+            <DetailItem label="E-mail" value={consorciado.email} />
+            <DetailItem
+              label="Cadastrado em"
+              value={new Date(consorciado.criadoEm).toLocaleDateString("pt-BR")}
             />
           </div>
-        ) : (
-          <div className={tableWrapClass()}>
-            <table className={dataTableClass()}>
-              <thead>
-                <tr>
-                  <th className={tableHeadCellClass()}>Contrato</th>
-                  <th className={tableHeadCellClass()}>Grupo</th>
-                  <th className={tableHeadCellClass()}>Cota</th>
-                  <th className={tableHeadCellClass()}>Produto / Plano</th>
-                  <th className={tableHeadCellClass()}>Vencimento</th>
-                  <th className={tableHeadCellClass()}>Status</th>
-                  <th className={tableHeadCellClass()}>Inconsistência</th>
-                  <th className={tableHeadCellClass()}>Administradora</th>
-                  <th className={tableHeadCellClass()}>Valor</th>
-                  <th className={`${tableHeadCellClass()} pr-0 text-right`}>Ação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {vendas.map((venda, index) => (
-                  <tr
-                    key={venda.id}
-                    className={`${tableRowClass(index)} cursor-pointer hover:bg-zinc-50/80`}
-                    onClick={() => {
-                      setSelectedVenda(venda);
-                      setDrawerOpen(true);
-                    }}
-                  >
-                    <td className={`${tableCellClass()} font-medium text-zinc-900`}>
-                      {venda.numeroContrato}
-                    </td>
-                    <td className={tableCellClass()}>{venda.grupo}</td>
-                    <td className={tableCellClass()}>{venda.cota}</td>
-                    <td className={tableCellClass()}>{venda.plano?.nome ?? "—"}</td>
-                    <td className={tableCellClass()}>Dia {venda.dataVencimento}</td>
-                    <td className={tableCellClass()}>
-                      <StatusBadge status={venda.statusOperacional} />
-                    </td>
-                    <td className={tableCellClass()}>
-                      <InconsistenciaBadge status={venda.statusInconsistencia} />
-                    </td>
-                    <td className={tableCellClass()}>{venda.administradora.nome}</td>
-                    <td className={`${tableCellClass()} tabular-nums`}>
-                      {formatMoneyPtBrFromCentavos(venda.valorCentavos)}
-                    </td>
-                    <td
-                      className={`${tableCellClass()} pr-0 text-right`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex items-center justify-end gap-2">
-                        <WhatsAppButton
-                          telefone={consorciado.telefone}
-                          nomeCliente={consorciado.nome}
-                          numeroContrato={venda.numeroContrato}
-                          statusOperacional={venda.statusOperacional}
-                          vendaId={venda.id}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedVenda(venda);
-                            setDrawerOpen(true);
-                          }}
-                          className={secondaryActionClass()}
-                        >
-                          Atendimento
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        </div>
       </section>
+
+      <ConsorciadoProdutosTable
+        consorciado={consorciado}
+        vendas={vendas}
+        onOpenAtendimento={openAtendimento}
+      />
 
       <ConsorciadoHistoricoTabs vendas={vendas} />
 

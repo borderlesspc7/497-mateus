@@ -83,13 +83,19 @@ export function resolveDataContrato(raw: {
   return raw.dataContrato ?? raw.dataVenda ?? raw.createdAt ?? new Date(0).toISOString();
 }
 
-/** Espelha statusOperacional no campo legado `status` para queries Firestore existentes. */
+/** Espelha statusOperacional no campo legado `status` para compatibilidade com documentos antigos. */
 export function withStatusOperacionalFields(statusOperacional: StatusOperacionalCota): {
   statusOperacional: StatusOperacionalCota;
   status: StatusOperacionalCota;
 } {
   return { statusOperacional, status: statusOperacional };
 }
+
+/** Campo canônico de status operacional da cota/contrato (nunca no consorciado). */
+export const STATUS_OPERACIONAL_FIELD = "statusOperacional" as const;
+
+/** Campo legado espelhado — mantido para documentos que ainda não foram regravados. */
+export const STATUS_OPERACIONAL_LEGACY_FIELD = "status" as const;
 
 export function normalizeVendaFields(raw: LegacyVendaDoc): Pick<
   VendaDoc,

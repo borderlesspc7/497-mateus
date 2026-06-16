@@ -15,12 +15,16 @@ export type StatusOperacionalCota = "ATIVO" | "INADIMPLENTE" | "CANCELADO";
 /** @deprecated Prefira StatusOperacionalCota. Mantido para compatibilidade. */
 export type VendaStatus = StatusOperacionalCota;
 
-/** Identificação da cota vinculada a um contrato (chave matriz do sistema). */
-export type CotaContrato = {
-  numeroContrato: string;
+/** Atributos descritivos da cota — não compõem a chave matriz (use apenas numeroContrato). */
+export type CotaIdentificacao = {
   grupo: string;
   cota: string;
   dataVencimento: number;
+};
+
+/** @deprecated Prefira CotaIdentificacao. Mantido para compatibilidade de importações. */
+export type CotaContrato = CotaIdentificacao & {
+  numeroContrato: string;
 };
 
 export type StatusPosVenda = "PENDENTE" | "FEITO";
@@ -171,8 +175,9 @@ export type VendaRow = {
   statusInconsistencia: StatusInconsistencia;
   statusPosVenda: StatusPosVenda;
   parcelasPagasCancelamento: number | null;
-  /** Chave matriz universal do sistema. */
+  /** Chave matriz universal — identificador único do produto/cota no sistema. */
   numeroContrato: string;
+  /** Atributos descritivos da cota (não fazem parte da chave matriz). */
   grupo: string;
   cota: string;
   dataVencimento: number;

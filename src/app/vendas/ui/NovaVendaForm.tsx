@@ -467,7 +467,7 @@ export default function NovaVendaForm({
               required
               value={form.numeroContrato}
               onChange={(v) => setForm((p) => ({ ...p, numeroContrato: v }))}
-              placeholder="Chave matriz do sistema"
+              placeholder="Identificador único do contrato"
             />
             <CurrencyInput
               label="Valor do crédito"
