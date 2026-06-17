@@ -6,13 +6,17 @@ import {
 } from "@/lib/firestore/contrato-matriz";
 import { aplicarEstornoCancelamentoVenda } from "@/lib/firestore/estorno-cancelamento";
 import { normalizeVendaFields } from "@/lib/firestore/legacy";
-import { listVendaDocsByStatusOperacional } from "@/lib/firestore/repository";
+import { resolveVendaIdByNumeroContrato, listVendaDocsByStatusOperacional } from "@/lib/firestore/repository";
 import { COLLECTIONS, nowIso, type ConsorciadoDoc, type VendaDoc } from "@/lib/firestore/types";
 import type {
   ImportConfirmItem,
   ImportConfirmResult,
   ImportReconciliationItem,
+  ImportReconciliationSummary,
 } from "@/lib/importacao/types";
+import type { ImportRowInput } from "@/lib/importacao/types";
+import { buildSpreadsheetContractSet } from "@/lib/importacao/reconciliation";
+import { buildInadimplenciaReconciliationSummary } from "@/lib/importacao/inadimplencia-reconciliation";
 
 export type { VendaContratoLookup };
 
@@ -49,7 +53,6 @@ export async function listInadimplentesMissingFromSpreadsheet(
   const vendas = await listVendaDocsByStatusOperacional("INADIMPLENTE");
 
   const inadimplentes: Array<{
-    vendaId: string;
     numeroContrato: string;
     grupo: string;
     cota: string;
@@ -68,7 +71,6 @@ export async function listInadimplentesMissingFromSpreadsheet(
     if (!numeroContrato || spreadsheetSet.has(numeroContrato)) continue;
 
     inadimplentes.push({
-      vendaId: data.id,
       numeroContrato,
       grupo: normalized.grupo,
       cota: normalized.cota,
@@ -92,7 +94,6 @@ export async function listInadimplentesMissingFromSpreadsheet(
 
   const missingFromSpreadsheet = inadimplentes
     .map((item) => ({
-      vendaId: item.vendaId,
       numeroContrato: item.numeroContrato,
       grupo: item.grupo,
       cota: item.cota,
@@ -104,8 +105,26 @@ export async function listInadimplentesMissingFromSpreadsheet(
 
   return {
     missingFromSpreadsheet,
-    totalInadimplentesNoSistema: inadimplentes.length,
+    totalInadimplentesNoSistema,
   };
+}
+
+/**
+ * Pré-processamento: compara planilha × inadimplentes no Firestore e
+ * retorna cotas órfãs que exigem conciliação manual antes do batch.
+ */
+export async function preprocessInadimplenciaReconciliation(
+  rows: ImportRowInput[],
+): Promise<ImportReconciliationSummary> {
+  const spreadsheetContractNumbers = [...buildSpreadsheetContractSet(rows)];
+  const { missingFromSpreadsheet, totalInadimplentesNoSistema } =
+    await listInadimplentesMissingFromSpreadsheet(spreadsheetContractNumbers);
+
+  return buildInadimplenciaReconciliationSummary({
+    missingFromSpreadsheet,
+    totalInadimplentesNoSistema,
+    spreadsheetUniqueContractCount: spreadsheetContractNumbers.length,
+  });
 }
 
 export async function batchUpdateVendaStatus(
@@ -121,7 +140,19 @@ export async function batchUpdateVendaStatus(
   const ts = nowIso();
 
   for (const item of updates) {
-    const ref = db.collection(COLLECTIONS.vendas).doc(item.vendaId);
+    const numeroContrato = normalizeNumeroContrato(item.numeroContrato);
+    if (!numeroContrato) {
+      skipped += 1;
+      continue;
+    }
+
+    const vendaId = await resolveVendaIdByNumeroContrato(numeroContrato);
+    if (!vendaId) {
+      skipped += 1;
+      continue;
+    }
+
+    const ref = db.collection(COLLECTIONS.vendas).doc(vendaId);
     const snap = await ref.get();
     if (!snap.exists) {
       skipped += 1;
@@ -166,7 +197,7 @@ export async function batchUpdateVendaStatus(
     updated += 1;
 
     if (isNovoCancelamento && item.parcelasPagasCancelamento !== undefined) {
-      await aplicarEstornoCancelamentoVenda(item.vendaId, item.parcelasPagasCancelamento);
+      await aplicarEstornoCancelamentoVenda(vendaId, item.parcelasPagasCancelamento);
     }
   }
 

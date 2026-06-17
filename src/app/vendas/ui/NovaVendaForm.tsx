@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { listPlanosMiniByAdministradora } from "@/actions/planos";
+import { findConsorciadoByCpfCnpj } from "@/actions/consorciados";
 import { listVendedoresMiniByEquipe } from "@/actions/vendedores";
 import { createVenda } from "@/actions/vendas";
 import { ConsorciadoAutocomplete } from "@/components/form/ConsorciadoAutocomplete";
@@ -56,7 +57,6 @@ type NovoConsorciadoFormState = {
 
 type NovaVendaFormProps = {
   administradoras: AdministradoraMini[];
-  consorciados: ConsorciadoMini[];
   equipes: EquipeMini[];
 };
 
@@ -116,13 +116,14 @@ function StepBadge({ number, done }: { number: number; done: boolean }) {
 
 export default function NovaVendaForm({
   administradoras,
-  consorciados: initialConsorciados,
   equipes,
 }: NovaVendaFormProps) {
   const router = useRouter();
   const [consorciadoMode, setConsorciadoMode] = useState<ConsorciadoMode>(null);
-  const [consorciados, setConsorciados] = useState<ConsorciadoMini[]>(initialConsorciados);
   const [consorciadoId, setConsorciadoId] = useState("");
+  const [consorciadoSelecionado, setConsorciadoSelecionado] = useState<ConsorciadoMini | null>(
+    null,
+  );
   const [novoConsorciado, setNovoConsorciado] = useState<NovoConsorciadoFormState>({
     nome: "",
     cpf_cnpj: "",
@@ -151,10 +152,17 @@ export default function NovaVendaForm({
   const [error, setError] = useState<string | null>(null);
   const [valorTouched, setValorTouched] = useState(false);
 
+  const novoConsorciadoValido = useMemo(
+    () => novoConsorciadoSchema.safeParse(novoConsorciado).success,
+    [novoConsorciado],
+  );
+
   const consorciadoPronto =
     consorciadoMode === "existente"
       ? Boolean(consorciadoId.trim())
-      : consorciadoMode === "novo";
+      : consorciadoMode === "novo"
+        ? novoConsorciadoValido
+        : false;
 
   useEffect(() => {
     if (!form.administradoraId) {
@@ -217,14 +225,9 @@ export default function NovaVendaForm({
     }
   }, [form.valor, valorTouched]);
 
-  function normalizeCpfCnpj(value: string): string {
-    return value.replace(/\D/g, "");
-  }
-
-  function findConsorciadoDuplicado(cpfCnpj: string): ConsorciadoMini | undefined {
-    const digits = normalizeCpfCnpj(cpfCnpj);
-    if (!digits) return undefined;
-    return consorciados.find((c) => normalizeCpfCnpj(c.cpf_cnpj) === digits);
+  function syncMesAnoFromDataFechamento(dataFechamento: string): string {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dataFechamento)) return "";
+    return dataFechamento.slice(0, 7);
   }
 
   async function resolveConsorciadoId(): Promise<string> {
@@ -236,7 +239,7 @@ export default function NovaVendaForm({
     const parsed = novoConsorciadoSchema.safeParse(novoConsorciado);
     if (!parsed.success) throw new Error(formatZodError(parsed.error));
 
-    const duplicado = findConsorciadoDuplicado(parsed.data.cpf_cnpj);
+    const duplicado = await findConsorciadoByCpfCnpj(parsed.data.cpf_cnpj);
     if (duplicado) {
       throw new Error(
         `Já existe um consorciado com este CPF/CNPJ (${duplicado.nome}). Use "Usar Existente" para vinculá-lo.`,
@@ -245,15 +248,6 @@ export default function NovaVendaForm({
 
     const input: ConsorciadoInput = parsed.data;
     const created = await createConsorciado(input);
-    setConsorciados((prev) => [
-      {
-        id: created.id,
-        nome: created.nome,
-        cpf_cnpj: created.cpf_cnpj,
-        telefone: created.telefone,
-      },
-      ...prev,
-    ]);
     return created.id;
   }
 
@@ -357,6 +351,7 @@ export default function NovaVendaForm({
             onClick={() => {
               setConsorciadoMode("existente");
               setNovoConsorciado({ nome: "", cpf_cnpj: "", telefone: "", email: "" });
+              setConsorciadoSelecionado(null);
             }}
           >
             Usar Existente
@@ -367,6 +362,7 @@ export default function NovaVendaForm({
             onClick={() => {
               setConsorciadoMode("novo");
               setConsorciadoId("");
+              setConsorciadoSelecionado(null);
             }}
           >
             Criar Novo Consorciado
@@ -380,23 +376,30 @@ export default function NovaVendaForm({
         ) : null}
 
         {consorciadoMode === "existente" ? (
-          <div className="relative z-20 mt-5">
+          <div className="relative z-20 mt-5 space-y-3">
             <label className="block">
               <div className="mb-1 text-xs font-medium text-zinc-600">
                 Buscar consorciado <span className="text-red-600"> *</span>
               </div>
               <ConsorciadoAutocomplete
-                consorciados={consorciados}
+                remoteSearch
                 value={consorciadoId}
-                onChange={setConsorciadoId}
-                disabled={consorciados.length === 0}
+                onChange={(id) => {
+                  setConsorciadoId(id);
+                  if (!id) setConsorciadoSelecionado(null);
+                }}
+                onSelect={setConsorciadoSelecionado}
                 required
               />
             </label>
-            {consorciados.length === 0 ? (
-              <p className="mt-2 text-xs text-zinc-500">
-                Nenhum consorciado cadastrado. Use &quot;Criar Novo Consorciado&quot;.
-              </p>
+            <p className="text-xs text-zinc-500">
+              A busca consulta o Firestore em tempo real por nome ou CPF/CNPJ.
+            </p>
+            {consorciadoSelecionado ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-900">
+                <span className="font-medium">{consorciadoSelecionado.nome}</span>
+                <span className="text-emerald-800"> · {consorciadoSelecionado.cpf_cnpj}</span>
+              </div>
             ) : null}
           </div>
         ) : null}
@@ -503,7 +506,13 @@ export default function NovaVendaForm({
               required
               type="date"
               value={form.dataFechamento}
-              onChange={(v) => setForm((p) => ({ ...p, dataFechamento: v }))}
+              onChange={(v) =>
+                setForm((p) => ({
+                  ...p,
+                  dataFechamento: v,
+                  mesAnoFechamento: syncMesAnoFromDataFechamento(v) || p.mesAnoFechamento,
+                }))
+              }
             />
             <Field
               label="Mês/ano de fechamento"

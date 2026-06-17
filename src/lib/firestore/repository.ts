@@ -318,6 +318,49 @@ export async function listConsorciadosMini(): Promise<ConsorciadoMini[]> {
   return rows.map(toConsorciadoMini);
 }
 
+function normalizeConsorciadoSearchDigits(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+/** Busca consorciados por nome ou CPF/CNPJ (consulta Firestore + filtro em memória). */
+export async function searchConsorciadosMini(
+  query: string,
+  limit = 12,
+): Promise<ConsorciadoMini[]> {
+  const rows = sortByCriadoEmDesc(await listConsorciadoDocs());
+  const all = rows.map(toConsorciadoMini);
+  const q = query.trim().toLowerCase();
+  const qDigits = normalizeConsorciadoSearchDigits(query);
+
+  if (!q && !qDigits) return all.slice(0, limit);
+
+  return all
+    .filter((item) => {
+      const hay = `${item.nome} ${item.cpf_cnpj}`.toLowerCase();
+      if (q && hay.includes(q)) return true;
+      if (qDigits) {
+        const docDigits = normalizeConsorciadoSearchDigits(item.cpf_cnpj);
+        return docDigits.includes(qDigits);
+      }
+      return false;
+    })
+    .slice(0, limit);
+}
+
+/** Verifica duplicidade de CPF/CNPJ antes de criar consorciado na nova venda. */
+export async function findConsorciadoMiniByCpfCnpj(
+  cpfCnpj: string,
+): Promise<ConsorciadoMini | null> {
+  const digits = normalizeConsorciadoSearchDigits(cpfCnpj);
+  if (!digits) return null;
+  const rows = await listConsorciadoDocs();
+  for (const doc of rows) {
+    const mini = toConsorciadoMini(doc);
+    if (normalizeConsorciadoSearchDigits(mini.cpf_cnpj) === digits) return mini;
+  }
+  return null;
+}
+
 export async function getConsorciado(id: string): Promise<ConsorciadoRow | null> {
   const doc = await getConsorciadoDoc(id);
   return doc ? toConsorciadoRow(doc) : null;
@@ -600,6 +643,13 @@ function buildVendasPaginatedQuery(filters: VendasListFilters) {
   }
 
   return q.orderBy("dataContrato", "desc").limit(VENDAS_PAGE_SIZE);
+}
+
+export async function resolveVendaIdByNumeroContrato(
+  numeroContrato: string,
+  excludeId?: string,
+): Promise<string | null> {
+  return findVendaDocIdByNumeroContrato(numeroContrato, excludeId);
 }
 
 async function findVendaDocIdByNumeroContrato(

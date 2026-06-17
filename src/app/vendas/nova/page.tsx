@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { listConsorciadosMini } from "@/actions/consorciados";
 import { listAdministradoras } from "@/actions/administradoras";
 import { listEquipesMini } from "@/actions/equipes";
 import { backLinkClass } from "@/components/page-flow/button-classes";
@@ -7,9 +6,8 @@ import { PageFlowHeader } from "@/components/page-flow/PageFlowHeader";
 import NovaVendaForm from "../ui/NovaVendaForm";
 
 export default async function NovaVendaPage() {
-  const [administradoras, consorciados, equipes] = await Promise.all([
+  const [administradoras, equipes] = await Promise.all([
     listAdministradoras(),
-    listConsorciadosMini(),
     listEquipesMini(),
   ]);
 
@@ -36,7 +34,6 @@ export default async function NovaVendaPage() {
           nome: a.nome,
           cnpj: a.cnpj,
         }))}
-        consorciados={consorciados}
         equipes={equipes}
       />
     </>

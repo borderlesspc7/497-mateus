@@ -46,6 +46,22 @@ export const novaVendaOperacionalSchema = novaVendaContratoSchema
 export type NovaVendaOperacionalInput = z.infer<typeof novaVendaOperacionalSchema>;
 export type NovoConsorciadoInput = z.infer<typeof novoConsorciadoSchema>;
 
+/** Campos obrigatórios da operação de venda (referência única para UI e server). */
+export const NOVA_VENDA_CAMPOS_OBRIGATORIOS = [
+  "numeroContrato",
+  "valorCentavos",
+  "grupo",
+  "cota",
+  "dataVencimento",
+  "dataFechamento",
+  "planoId",
+  "mesAnoFechamento",
+  "vendedorId",
+  "equipeId",
+  "administradoraId",
+  "statusOperacional",
+] as const;
+
 export function parseValorCreditoToCentavos(valor: string): number {
   const centavos = parseCurrencyToCentavos(valor.trim());
   if (centavos === null || centavos <= 0) {

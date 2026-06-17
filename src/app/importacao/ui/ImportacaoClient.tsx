@@ -31,6 +31,7 @@ import type {
   ImportReconciliationResolution,
   ImportRowInput,
 } from "@/lib/importacao/types";
+import { ImportacaoReconciliationModal } from "./ImportacaoReconciliationModal";
 import { ImportacaoReconciliationPanel } from "./ImportacaoReconciliationPanel";
 
 type ImportPhase = "idle" | "parsing" | "previewing" | "confirming" | "done";
@@ -55,6 +56,8 @@ export default function ImportacaoClient() {
   const [reconciliationResolutions, setReconciliationResolutions] = useState<
     Record<string, ImportReconciliationResolution | undefined>
   >({});
+  const [reconciliationModalOpen, setReconciliationModalOpen] = useState(false);
+  const [reconciliationGatePassed, setReconciliationGatePassed] = useState(false);
 
   const isBusy = phase === "parsing" || phase === "previewing" || phase === "confirming";
 
@@ -93,6 +96,8 @@ export default function ImportacaoClient() {
     setConfirmResult(null);
     setFilter("all");
     setReconciliationResolutions({});
+    setReconciliationModalOpen(false);
+    setReconciliationGatePassed(false);
   }, []);
 
   const reconciliationComplete = useMemo(() => {
@@ -103,15 +108,27 @@ export default function ImportacaoClient() {
     );
   }, [preview, reconciliationResolutions]);
 
+  const requiresReconciliationGate = Boolean(
+    preview?.reconciliation.requiresManualReconciliation,
+  );
+
   const canConfirmImport = useMemo(() => {
     if (!preview || phase === "done") return false;
     if (!reconciliationComplete) return false;
+    if (requiresReconciliationGate && !reconciliationGatePassed) return false;
     const spreadsheetUpdates = preview.matched.filter((item) => item.willUpdate).length;
     const reconciliationUpdates = preview.reconciliation.missingFromSpreadsheet.filter(
-      (item) => reconciliationResolutions[item.vendaId],
+      (item) => reconciliationResolutions[item.numeroContrato],
     ).length;
     return spreadsheetUpdates + reconciliationUpdates > 0;
-  }, [phase, preview, reconciliationComplete, reconciliationResolutions]);
+  }, [
+    phase,
+    preview,
+    reconciliationComplete,
+    requiresReconciliationGate,
+    reconciliationGatePassed,
+    reconciliationResolutions,
+  ]);
 
   const processFile = useCallback(async (file: File) => {
     resetState();
@@ -133,6 +150,8 @@ export default function ImportacaoClient() {
       setParsedRows(parsed.rows);
       setPreview(result);
       setReconciliationResolutions({});
+      setReconciliationGatePassed(false);
+      setReconciliationModalOpen(result.reconciliation.requiresManualReconciliation);
       setPhase("idle");
     } catch (error) {
       setParseErrors([
@@ -170,16 +189,16 @@ export default function ImportacaoClient() {
     const spreadsheetUpdates: ImportConfirmItem[] = preview.matched
       .filter((item) => item.willUpdate)
       .map((item) => ({
-        vendaId: item.vendaId,
+        numeroContrato: item.numeroContrato,
         statusOperacional: item.statusNovo,
         parcelasPagasCancelamento: item.parcelasPagasCancelamento,
       }));
 
     const reconciliationUpdates: ImportConfirmItem[] = preview.reconciliation.missingFromSpreadsheet
-      .map((item) => reconciliationResolutions[item.vendaId])
+      .map((item) => reconciliationResolutions[item.numeroContrato])
       .filter((item): item is ImportReconciliationResolution => Boolean(item))
       .map((item) => ({
-        vendaId: item.vendaId,
+        numeroContrato: item.numeroContrato,
         statusOperacional: item.statusOperacional,
         parcelasPagasCancelamento: item.parcelasPagasCancelamento,
       }));
@@ -205,8 +224,8 @@ export default function ImportacaoClient() {
   function resolveReconciliationAtivo(item: ImportReconciliationItem) {
     setReconciliationResolutions((current) => ({
       ...current,
-      [item.vendaId]: {
-        vendaId: item.vendaId,
+      [item.numeroContrato]: {
+        numeroContrato: item.numeroContrato,
         statusOperacional: "ATIVO",
       },
     }));
@@ -215,18 +234,18 @@ export default function ImportacaoClient() {
   function resolveReconciliationCancelado(item: ImportReconciliationItem, parcelasPagas: number) {
     setReconciliationResolutions((current) => ({
       ...current,
-      [item.vendaId]: {
-        vendaId: item.vendaId,
+      [item.numeroContrato]: {
+        numeroContrato: item.numeroContrato,
         statusOperacional: "CANCELADO",
         parcelasPagasCancelamento: parcelasPagas,
       },
     }));
   }
 
-  function clearReconciliationResolution(vendaId: string) {
+  function clearReconciliationResolution(numeroContrato: string) {
     setReconciliationResolutions((current) => {
       const next = { ...current };
-      delete next[vendaId];
+      delete next[numeroContrato];
       return next;
     });
   }
@@ -335,15 +354,32 @@ export default function ImportacaoClient() {
 
       {preview ? (
         <>
-          <ImportacaoReconciliationPanel
+          <ImportacaoReconciliationModal
+            open={reconciliationModalOpen}
             reconciliation={preview.reconciliation}
             resolutions={reconciliationResolutions}
             onResolveAtivo={resolveReconciliationAtivo}
             onResolveCancelado={resolveReconciliationCancelado}
             onClearResolution={clearReconciliationResolution}
+            onContinue={() => {
+              setReconciliationModalOpen(false);
+              setReconciliationGatePassed(true);
+            }}
           />
 
-          <div className={panelClass()}>
+          <ImportacaoReconciliationPanel
+            reconciliation={preview.reconciliation}
+            reconciliationGatePassed={reconciliationGatePassed}
+          />
+
+          <div
+            className={[
+              panelClass(),
+              requiresReconciliationGate && !reconciliationGatePassed
+                ? "pointer-events-none opacity-50"
+                : "",
+            ].join(" ")}
+          >
             <PanelSectionHeader
               title="Pré-visualização"
               description="Revise os registros antes de confirmar. Contratos encontrados aparecem em verde; ausentes no sistema, em amarelo."
@@ -356,11 +392,17 @@ export default function ImportacaoClient() {
                   {preview.summary.invalid > 0 ? (
                     <SummaryChip label="Inválidos" value={preview.summary.invalid} tone="red" />
                   ) : null}
-                  {preview.reconciliation.totalDivergentes > 0 ? (
+                  {preview.reconciliation.requiresManualReconciliation ? (
                     <SummaryChip
-                      label="Divergentes"
+                      label="Órfãos"
                       value={preview.reconciliation.totalDivergentes}
                       tone="yellow"
+                    />
+                  ) : null}
+                  {preview.reconciliation.totalInadimplentesNoSistema > 0 ? (
+                    <SummaryChip
+                      label="Inadimpl. sistema"
+                      value={preview.reconciliation.totalInadimplentesNoSistema}
                     />
                   ) : null}
                 </>
@@ -487,19 +529,21 @@ export default function ImportacaoClient() {
 
               <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-sm text-zinc-600">
-                  {!reconciliationComplete
-                    ? `Conciliação pendente: defina o status de ${preview.reconciliation.totalDivergentes} contrato(s) ausente(s) na planilha.`
-                    : preview.summary.toUpdate > 0 ||
-                        preview.reconciliation.missingFromSpreadsheet.some(
-                          (item) => reconciliationResolutions[item.vendaId],
-                        )
-                      ? `${
-                          preview.summary.toUpdate +
-                          preview.reconciliation.missingFromSpreadsheet.filter(
-                            (item) => reconciliationResolutions[item.vendaId],
-                          ).length
-                        } contrato(s) serão atualizados após a confirmação.`
-                      : "Nenhuma alteração pendente para confirmar."}
+                  {requiresReconciliationGate && !reconciliationGatePassed
+                    ? "Complete a conciliação no modal para liberar a confirmação."
+                    : !reconciliationComplete
+                      ? `Conciliação pendente: defina o status de ${preview.reconciliation.totalDivergentes} contrato(s) ausente(s) na planilha.`
+                      : preview.summary.toUpdate > 0 ||
+                          preview.reconciliation.missingFromSpreadsheet.some(
+                            (item) => reconciliationResolutions[item.numeroContrato],
+                          )
+                        ? `${
+                            preview.summary.toUpdate +
+                            preview.reconciliation.missingFromSpreadsheet.filter(
+                              (item) => reconciliationResolutions[item.numeroContrato],
+                            ).length
+                          } contrato(s) serão atualizados após a confirmação.`
+                        : "Nenhuma alteração pendente para confirmar."}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button

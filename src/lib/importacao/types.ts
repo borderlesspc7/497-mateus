@@ -46,8 +46,9 @@ export type ImportPreviewResult = {
   reconciliation: ImportReconciliationSummary;
 };
 
+/** Atualização de status na remessa — chaveada pelo número do contrato (matriz universal). */
 export type ImportConfirmItem = {
-  vendaId: string;
+  numeroContrato: string;
   statusOperacional: StatusOperacionalCota;
   parcelasPagasCancelamento?: number;
 };
@@ -58,7 +59,6 @@ export type ImportConfirmResult = {
 };
 
 export type ImportReconciliationItem = {
-  vendaId: string;
   numeroContrato: string;
   grupo: string;
   cota: string;
@@ -66,16 +66,23 @@ export type ImportReconciliationItem = {
 };
 
 export type ImportReconciliationResolution = {
-  vendaId: string;
+  numeroContrato: string;
   statusOperacional: "ATIVO" | "CANCELADO";
   parcelasPagasCancelamento?: number;
 };
 
 export type ImportReconciliationSummary = {
   missingFromSpreadsheet: ImportReconciliationItem[];
+  /** Total de contratos INADIMPLENTE registrados no Firestore. */
   totalInadimplentesNoSistema: number;
-  totalNaPlanilha: number;
+  /** Inadimplentes do banco cujo número consta na planilha (cobertos pela remessa). */
+  totalInadimplentesCobertosNaPlanilha: number;
+  /** Contratos únicos presentes na planilha (qualquer status). */
+  totalContratosUnicosNaPlanilha: number;
+  /** Inadimplentes no banco ausentes na planilha — exigem conciliação manual. */
   totalDivergentes: number;
+  /** Bloqueia confirmação até o usuário definir status de cada órfão. */
+  requiresManualReconciliation: boolean;
 };
 
 export type ImportConfirmPayload = {

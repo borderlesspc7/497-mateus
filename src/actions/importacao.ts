@@ -7,8 +7,10 @@ import {
   batchUpdateVendaStatus,
   buildVendaContratoLookupMap,
   listInadimplentesMissingFromSpreadsheet,
+  preprocessInadimplenciaReconciliation,
 } from "@/lib/firestore/vendas-import";
 import { newId } from "@/lib/firestore/types";
+import { buildInadimplenciaReconciliationSummary } from "@/lib/importacao/inadimplencia-reconciliation";
 import { buildSpreadsheetContractSet } from "@/lib/importacao/reconciliation";
 import type {
   ImportConfirmItem,
@@ -126,9 +128,7 @@ export async function previewImportacaoStatus(
   }
 
   const spreadsheetContractNumbers = [...buildSpreadsheetContractSet(rows)];
-  const reconciliationData = await listInadimplentesMissingFromSpreadsheet(
-    spreadsheetContractNumbers,
-  );
+  const reconciliation = await preprocessInadimplenciaReconciliation(rows);
 
   const toUpdate = matched.filter((item) => item.willUpdate).length;
   const unchanged = matched.length - toUpdate;
@@ -144,12 +144,7 @@ export async function previewImportacaoStatus(
       unchanged,
       invalid: invalid.length,
     },
-    reconciliation: {
-      missingFromSpreadsheet: reconciliationData.missingFromSpreadsheet,
-      totalInadimplentesNoSistema: reconciliationData.totalInadimplentesNoSistema,
-      totalNaPlanilha: spreadsheetContractNumbers.length,
-      totalDivergentes: reconciliationData.missingFromSpreadsheet.length,
-    },
+    reconciliation,
   };
 }
 
@@ -169,36 +164,43 @@ export async function confirmImportacaoStatus(
     throw new Error("Contexto de conciliação inválido.");
   }
 
-  const reconciliationData = await listInadimplentesMissingFromSpreadsheet(
-    spreadsheetContractNumbers,
-  );
-  const missingIds = new Set(
-    reconciliationData.missingFromSpreadsheet.map((item) => item.vendaId),
+  const normalizedContracts = spreadsheetContractNumbers
+    .map((item) => normalizeContrato(item))
+    .filter(Boolean);
+  const reconciliationData = await listInadimplentesMissingFromSpreadsheet(normalizedContracts);
+  const reconciliation = buildInadimplenciaReconciliationSummary({
+    missingFromSpreadsheet: reconciliationData.missingFromSpreadsheet,
+    totalInadimplentesNoSistema: reconciliationData.totalInadimplentesNoSistema,
+    spreadsheetUniqueContractCount: normalizedContracts.length,
+  });
+  const missingContracts = new Set(
+    reconciliation.missingFromSpreadsheet.map((item) => item.numeroContrato),
   );
 
-  if (missingIds.size > 0) {
-    const resolvedIds = new Set<string>();
+  if (missingContracts.size > 0) {
+    const resolvedContracts = new Set<string>();
     for (const item of updates) {
-      if (!missingIds.has(item.vendaId)) continue;
+      const numeroContrato = normalizeContrato(item.numeroContrato);
+      if (!numeroContrato || !missingContracts.has(numeroContrato)) continue;
       assertValidReconciliationStatus(item.statusOperacional);
       if (item.statusOperacional === "CANCELADO" && item.parcelasPagasCancelamento === undefined) {
         throw new Error(
           "Conciliação pendente: informe PARCELAS_PAGAS para contratos marcados como cancelados.",
         );
       }
-      resolvedIds.add(item.vendaId);
+      resolvedContracts.add(numeroContrato);
     }
 
-    if (resolvedIds.size !== missingIds.size) {
+    if (resolvedContracts.size !== missingContracts.size) {
       throw new Error(
-        `Conciliação obrigatória: ${missingIds.size - resolvedIds.size} contrato(s) inadimplente(s) ausente(s) na planilha ainda precisam de definição (Ativo ou Cancelado).`,
+        `Conciliação obrigatória: ${missingContracts.size - resolvedContracts.size} contrato(s) inadimplente(s) ausente(s) na planilha ainda precisam de definição (Ativo ou Cancelado).`,
       );
     }
   }
 
   for (const item of updates) {
-    if (!item.vendaId?.trim()) {
-      throw new Error("Identificador de venda inválido na confirmação.");
+    if (!normalizeContrato(item.numeroContrato)) {
+      throw new Error("Número do contrato inválido na confirmação.");
     }
     assertValidStatus(item.statusOperacional);
     if (item.statusOperacional === "CANCELADO" && item.parcelasPagasCancelamento === undefined) {

@@ -21,7 +21,7 @@ export function isReconciliationComplete(
   if (missing.length === 0) return true;
 
   return missing.every((item) => {
-    const resolution = resolutions[item.vendaId];
+    const resolution = resolutions[item.numeroContrato];
     if (!resolution) return false;
     if (resolution.statusOperacional === "ATIVO") return true;
     if (resolution.statusOperacional === "CANCELADO") {
@@ -40,7 +40,7 @@ export function countPendingReconciliation(
   resolutions: Record<string, ImportReconciliationResolution | undefined>,
 ): number {
   return missing.filter((item) => {
-    const resolution = resolutions[item.vendaId];
+    const resolution = resolutions[item.numeroContrato];
     if (!resolution) return true;
     if (resolution.statusOperacional === "ATIVO") return false;
     if (resolution.statusOperacional === "CANCELADO") {
