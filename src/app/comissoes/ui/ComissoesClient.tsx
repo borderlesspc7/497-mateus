@@ -176,7 +176,7 @@ export default function ComissoesClient({ initialItems }: ComissoesClientProps) 
           title={items.length === 0 ? "Nenhum extrato gerado" : "Nenhum resultado encontrado"}
           description={
             items.length === 0
-              ? "Cadastre planos com regras financeiras e vendas ativas com plano vinculado. Depois use Recalcular extratos."
+              ? "Os extratos são gerados automaticamente ao registrar vendas ativas com plano e regras financeiras. Use Recalcular extratos para reprocessar vendas antigas."
               : "Ajuste os filtros ou recalcule os extratos."
           }
           action={

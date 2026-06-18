@@ -842,6 +842,7 @@ export async function createVenda(
     updatedAt: ts,
   };
   await db().collection(COLLECTIONS.vendas).doc(id).set(doc);
+  await syncExtratosComissaoForVenda(id);
   return toVendaRow({ id, ...doc }, adm, plano, consorciado, equipe, vendedor);
 }
 
@@ -909,6 +910,7 @@ export async function updateVenda(
     updatedAt: nowIso(),
   };
   await db().collection(COLLECTIONS.vendas).doc(id).set(next);
+  await syncExtratosComissaoForVenda(id);
   return toVendaRow({ id, ...next }, adm, plano, consorciado, equipe, vendedor);
 }
 
@@ -1008,81 +1010,82 @@ async function listExtratoDocs(): Promise<DocWithId<ExtratoDoc>[]> {
   return snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as ExtratoDoc) }));
 }
 
-export async function syncExtratosComissao(): Promise<number> {
-  const [vendas, planos] = await Promise.all([listVendaDocs(), listPlanoDocs()]);
-  const planoMap = new Map(planos.map((p) => [p.id, p]));
-  const vendaMap = new Map(vendas.map((v) => [v.id, normalizeVendaDoc(v)]));
-  const existing = await listExtratoDocs();
-  const existingMap = new Map(existing.map((e) => [e.id, e]));
-  const ts = nowIso();
+async function listExtratoDocsByVendaId(vendaId: string): Promise<DocWithId<ExtratoDoc>[]> {
+  const snap = await db()
+    .collection(COLLECTIONS.extratos)
+    .where("vendaId", "==", vendaId)
+    .get();
+  return snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as ExtratoDoc) }));
+}
+
+/** Gera/atualiza/remove extratos de comissão de uma única venda. */
+async function applyExtratosComissaoForVenda(
+  venda: DocWithId<VendaDoc>,
+  plano: DocWithId<PlanoDoc> | null,
+  existingExtratos: DocWithId<ExtratoDoc>[],
+  ts: string,
+): Promise<number> {
   let changed = 0;
+  const existingMap = new Map(existingExtratos.map((e) => [e.id, e]));
+  const regras = plano ? resolvePlanoRegrasFinanceiras(plano) : null;
 
-  for (const raw of vendas) {
-    const venda = normalizeVendaDoc(raw);
-    if (!vendaGeraExtratosComissao(venda.statusOperacional) || !venda.planoId) continue;
-
-    const plano = planoMap.get(venda.planoId);
-    if (!plano) continue;
-
-    const regras = resolvePlanoRegrasFinanceiras(plano);
-    if (!regras) continue;
-
+  if (
+    vendaGeraExtratosComissao(venda.statusOperacional) &&
+    venda.planoId &&
+    plano &&
+    regras
+  ) {
     const creditoCentavos = resolverCreditoCentavos(
       venda.valorCentavos,
       plano.valorCreditoCentavos,
     );
-    if (creditoCentavos === null) continue;
 
-    const parcelas = calcularParcelasComissao(creditoCentavos, regras);
+    if (creditoCentavos !== null) {
+      const parcelas = calcularParcelasComissao(creditoCentavos, regras);
 
-    for (const parcela of parcelas) {
-      const id = extratoDocId(venda.id, parcela.numero);
-      const prev = existingMap.get(id);
+      for (const parcela of parcelas) {
+        const id = extratoDocId(venda.id, parcela.numero);
+        const prev = existingMap.get(id);
 
-      if (prev && prev.status !== "PENDENTE") continue;
+        if (prev && prev.status !== "PENDENTE") continue;
 
-      const doc: ExtratoDoc = {
-        vendaId: venda.id,
-        numeroContrato: venda.numeroContrato,
-        planoId: plano.id,
-        parcelaNumero: parcela.numero,
-        parcelaTotal: regras.parcelasRecebimento,
-        parcelaLabel: parcela.label,
-        valorCentavos: parcela.valorCentavos,
-        status: prev?.status ?? "PENDENTE",
-        tipo: prev?.tipo ?? "COMISSAO",
-        vendedorId: venda.vendedorId,
-        equipeId: venda.equipeId,
-        createdAt: prev?.createdAt ?? ts,
-        updatedAt: ts,
-      };
+        const doc: ExtratoDoc = {
+          vendaId: venda.id,
+          numeroContrato: venda.numeroContrato,
+          planoId: plano.id,
+          parcelaNumero: parcela.numero,
+          parcelaTotal: regras.parcelasRecebimento,
+          parcelaLabel: parcela.label,
+          valorCentavos: parcela.valorCentavos,
+          status: prev?.status ?? "PENDENTE",
+          tipo: prev?.tipo ?? "COMISSAO",
+          vendedorId: venda.vendedorId,
+          equipeId: venda.equipeId,
+          createdAt: prev?.createdAt ?? ts,
+          updatedAt: ts,
+        };
 
-      const docChanged =
-        !prev ||
-        prev.valorCentavos !== doc.valorCentavos ||
-        prev.parcelaTotal !== doc.parcelaTotal;
+        const docChanged =
+          !prev ||
+          prev.valorCentavos !== doc.valorCentavos ||
+          prev.parcelaTotal !== doc.parcelaTotal ||
+          prev.vendedorId !== doc.vendedorId ||
+          prev.equipeId !== doc.equipeId ||
+          prev.numeroContrato !== doc.numeroContrato ||
+          prev.planoId !== doc.planoId;
 
-      if (docChanged) {
-        await db().collection(COLLECTIONS.extratos).doc(id).set(doc);
-        changed += 1;
+        if (docChanged) {
+          await db().collection(COLLECTIONS.extratos).doc(id).set(doc);
+          changed += 1;
+        }
       }
     }
   }
 
-  for (const extrato of existing) {
-    const extratoData = extrato as DocWithId<ExtratoDoc> & { tipo?: ExtratoDoc["tipo"] };
-    if ((extratoData.tipo ?? "COMISSAO") === "ESTORNO") continue;
+  const dataReferencia = venda.dataVenda ?? venda.updatedAt;
 
-    const venda = vendaMap.get(extrato.vendaId);
-    if (!venda) {
-      await db().collection(COLLECTIONS.extratos).doc(extrato.id).delete();
-      changed += 1;
-      continue;
-    }
-
-    const plano = planoMap.get(extrato.planoId);
-    const regras = plano ? resolvePlanoRegrasFinanceiras(plano) : null;
-    const dataReferencia = venda.dataVenda ?? venda.updatedAt;
+  for (const extrato of existingExtratos) {
+    if ((extrato.tipo ?? "COMISSAO") === "ESTORNO") continue;
 
     const deveEstornar =
       !vendaGeraExtratosComissao(venda.statusOperacional) &&
@@ -1098,6 +1101,52 @@ export async function syncExtratosComissao(): Promise<number> {
       await db().collection(COLLECTIONS.extratos).doc(extrato.id).delete();
       changed += 1;
     }
+  }
+
+  return changed;
+}
+
+/** Sincroniza extratos de comissão apenas da venda informada (uso em create/update). */
+export async function syncExtratosComissaoForVenda(vendaId: string): Promise<number> {
+  const vendaSnap = await db().collection(COLLECTIONS.vendas).doc(vendaId).get();
+  if (!vendaSnap.exists) return 0;
+
+  const venda = normalizeVendaDoc({ id: vendaSnap.id, ...(vendaSnap.data() as VendaDoc) });
+  const plano = venda.planoId ? await getPlanoDoc(venda.planoId) : null;
+  const existing = await listExtratoDocsByVendaId(vendaId);
+  return applyExtratosComissaoForVenda(venda, plano, existing, nowIso());
+}
+
+export async function syncExtratosComissao(): Promise<number> {
+  const [vendas, planos] = await Promise.all([listVendaDocs(), listPlanoDocs()]);
+  const planoMap = new Map(planos.map((p) => [p.id, p]));
+  const existing = await listExtratoDocs();
+  const extratosByVenda = new Map<string, DocWithId<ExtratoDoc>[]>();
+  for (const extrato of existing) {
+    const list = extratosByVenda.get(extrato.vendaId) ?? [];
+    list.push(extrato);
+    extratosByVenda.set(extrato.vendaId, list);
+  }
+  const ts = nowIso();
+  let changed = 0;
+
+  for (const raw of vendas) {
+    const venda = normalizeVendaDoc(raw);
+    const plano = venda.planoId ? (planoMap.get(venda.planoId) ?? null) : null;
+    changed += await applyExtratosComissaoForVenda(
+      venda,
+      plano,
+      extratosByVenda.get(venda.id) ?? [],
+      ts,
+    );
+  }
+
+  const vendaIds = new Set(vendas.map((v) => v.id));
+  for (const extrato of existing) {
+    if ((extrato.tipo ?? "COMISSAO") === "ESTORNO") continue;
+    if (vendaIds.has(extrato.vendaId)) continue;
+    await db().collection(COLLECTIONS.extratos).doc(extrato.id).delete();
+    changed += 1;
   }
 
   return changed;

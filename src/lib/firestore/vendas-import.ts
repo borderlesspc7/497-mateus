@@ -6,7 +6,7 @@ import {
 } from "@/lib/firestore/contrato-matriz";
 import { aplicarEstornoCancelamentoVenda } from "@/lib/firestore/estorno-cancelamento";
 import { normalizeVendaFields } from "@/lib/firestore/legacy";
-import { resolveVendaIdByNumeroContrato, listVendaDocsByStatusOperacional } from "@/lib/firestore/repository";
+import { resolveVendaIdByNumeroContrato, listVendaDocsByStatusOperacional, syncExtratosComissaoForVenda } from "@/lib/firestore/repository";
 import { COLLECTIONS, nowIso, type ConsorciadoDoc, type VendaDoc } from "@/lib/firestore/types";
 import type {
   ImportConfirmItem,
@@ -195,6 +195,10 @@ export async function batchUpdateVendaStatus(
         : {}),
     });
     updated += 1;
+
+    if (item.statusOperacional === "ATIVO") {
+      await syncExtratosComissaoForVenda(vendaId);
+    }
 
     if (isNovoCancelamento && item.parcelasPagasCancelamento !== undefined) {
       await aplicarEstornoCancelamentoVenda(vendaId, item.parcelasPagasCancelamento);

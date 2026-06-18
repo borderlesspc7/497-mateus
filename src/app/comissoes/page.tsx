@@ -26,7 +26,7 @@ export default async function ComissoesPage() {
           { label: "Comissões" },
         ]}
         title="Extratos de comissão"
-        description="Parcelas geradas automaticamente a partir de vendas ativas e regras dos planos. Aprove liberações e registre pagamentos."
+        description="Parcelas geradas automaticamente ao registrar vendas ativas. Aprove liberações e registre pagamentos."
       />
 
       <Suspense fallback={<PageLoading rows={8} columns={5} withHeader={false} />}>
