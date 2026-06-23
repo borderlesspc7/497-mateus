@@ -1,4 +1,6 @@
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  "auth/api-key-not-valid.-please-pass-a-valid-api-key.":
+    "API key do Firebase inválida. No .env, use o firebaseConfig do mesmo projeto da service account (mateus-40473) — Firebase Console → Configurações → Seus apps → Web.",
   "auth/email-already-in-use": "Este e-mail já está cadastrado.",
   "auth/invalid-email": "E-mail inválido.",
   "auth/weak-password": "A senha deve ter pelo menos 6 caracteres.",

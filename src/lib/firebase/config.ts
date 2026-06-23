@@ -17,3 +17,10 @@ export function isFirebasePublicConfigReady(): boolean {
       firebasePublicConfig.appId,
   );
 }
+
+export function isFirebaseAnalyticsEnabled(): boolean {
+  return (
+    process.env.NEXT_PUBLIC_FIREBASE_ANALYTICS_ENABLED === "true" &&
+    Boolean(firebasePublicConfig.measurementId)
+  );
+}

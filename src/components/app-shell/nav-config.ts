@@ -7,6 +7,7 @@ import {
   HeadphonesIcon,
   LayoutDashboard,
   Settings,
+  Target,
   Upload,
   Users,
   Wallet,
@@ -47,6 +48,11 @@ export function buildMainNav(role: UserRole | null): NavLinkItem[] {
   if (role && canViewComissoes(role)) {
     items.splice(3, 0, { href: "/comissoes", label: "Comissões", icon: DollarSign });
   }
+  if (role && canAccessConfiguracoes(role)) {
+    items.splice(4, 0, { href: "/metas", label: "Metas", icon: Target });
+  } else if (role === "vendedor") {
+    items.splice(3, 0, { href: "/metas/minhas", label: "Minhas Metas", icon: Target });
+  }
   if (!role || !canAccessConfiguracoes(role)) {
     return items.filter((item) => item.href !== "/importacao");
   }
@@ -80,6 +86,8 @@ const ROUTE_LABELS: Record<string, string> = {
   consorciados: "Consorciados",
   vendas: "Vendas",
   comissoes: "Comissões",
+  metas: "Metas",
+  minhas: "Minhas Metas",
   importacao: "Importação",
   controle: "Controle",
   inadimplencia: "Inadimplência",

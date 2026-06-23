@@ -38,6 +38,7 @@ firebase/serviceAccountKey.json
 firebase/*-firebase-adminsdk*.json
 *-firebase-adminsdk*.json
 mateus-40473-firebase-adminsdk-fbsvc-f7add1932a.json
+mateus-40473-firebase-adminsdk-fbsvc-e228c9f8d7.json
 
 # local database (SQLite)
 dev.db

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { getDashboardRanking, getDashboardStats } from "@/actions/dashboard";
 import { DashboardTabs } from "@/components/dashboard/DashboardTabs";
+import { DashboardMetaWidget } from "@/components/metas/DashboardMetaWidget";
 import { PageFlowHeader } from "@/components/page-flow/PageFlowHeader";
 import { KpiCardSkeleton } from "@/components/ui/Skeleton";
 import { panelClass } from "@/components/ui/list-panel-classes";
@@ -44,7 +45,12 @@ async function DashboardContent() {
     getServerSessionUser(),
   ]);
   return (
-    <DashboardTabs stats={stats} ranking={ranking} userRole={session?.role ?? null} />
+    <>
+      <div className="mb-6">
+        <DashboardMetaWidget userRole={session?.role ?? null} />
+      </div>
+      <DashboardTabs stats={stats} ranking={ranking} userRole={session?.role ?? null} />
+    </>
   );
 }
 

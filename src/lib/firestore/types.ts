@@ -16,6 +16,9 @@ export const COLLECTIONS = {
   extratos: "extratos",
   usuarios: "usuarios",
   logs_auditoria: "logs_auditoria",
+  metas: "metas",
+  realizacoes: "realizacoes",
+  conquistas: "conquistas",
 } as const;
 
 export const VENDA_SUBCOLLECTIONS = {

@@ -72,5 +72,20 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isGerenteOrAdmin();
     }
+
+    match /metas/{metaId} {
+      allow read: if isSignedIn();
+      allow write: if isGerenteOrAdmin();
+    }
+
+    match /realizacoes/{realizacaoId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /conquistas/{conquistaId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
   }
 }
