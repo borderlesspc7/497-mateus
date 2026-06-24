@@ -19,6 +19,9 @@ function normalizeServiceAccount(raw: ServiceAccountPayload): ServiceAccount {
 }
 
 function loadServiceAccountFromFile(): ServiceAccount | null {
+  // Em Netlify/Vercel o JSON local não existe — use variáveis de ambiente.
+  if (process.env.NETLIFY || process.env.VERCEL) return null;
+
   const relativePath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH?.trim();
   if (!relativePath) return null;
 

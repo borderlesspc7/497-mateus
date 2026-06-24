@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { establishServerSession, signUpWithEmail } from "@/lib/firebase/auth-client";
 import { formControlClass, panelClass } from "@/components/ui/list-panel-classes";
 
@@ -13,7 +13,39 @@ export default function CadastroForm() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkingRegistration, setCheckingRegistration] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+
+    void fetch("/api/auth/registration-allowed")
+      .then(async (response) => {
+        const data = (await response.json()) as { allowed?: boolean; error?: string };
+        if (!alive) return;
+
+        if (!response.ok) {
+          setError(data.error ?? "Não foi possível verificar o cadastro.");
+          return;
+        }
+
+        if (!data.allowed) {
+          router.replace("/login");
+          return;
+        }
+      })
+      .catch(() => {
+        if (!alive) return;
+        setError("Não foi possível verificar o cadastro.");
+      })
+      .finally(() => {
+        if (alive) setCheckingRegistration(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [router]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,6 +79,14 @@ export default function CadastroForm() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (checkingRegistration) {
+    return (
+      <div className={`${panelClass()} p-6 sm:p-8`}>
+        <p className="text-center text-sm text-muted-foreground">Verificando cadastro...</p>
+      </div>
+    );
   }
 
   return (

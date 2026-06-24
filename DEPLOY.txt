@@ -15,6 +15,9 @@ O app usa Firebase Admin SDK no servidor (Netlify/Vercel) e SDK web no browser
    NEXT_PUBLIC_FIREBASE_APP_ID
    FIREBASE_PROJECT_ID
 
+   NÃO use FIREBASE_SERVICE_ACCOUNT_PATH em produção (o arquivo não existe no servidor).
+   Remova essa variável do painel Netlify se estiver configurada.
+
    Service account (escolha UMA opção — o arquivo JSON NÃO vai no Git):
 
    Opção A — JSON inteiro em uma variável:

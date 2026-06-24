@@ -19,6 +19,9 @@ export const metadata: Metadata = {
   description: "Sistema de gestão operacional para consórcios.",
 };
 
+/** App depende de Firebase Admin em runtime — evita prerender no build (Netlify/Vercel). */
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({
   children,
 }: Readonly<{
